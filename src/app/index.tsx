@@ -3,18 +3,10 @@ import { StyleSheet, Text, View } from "react-native";
 
 export default function Home() {
   return (
+    
     <View style={styles.container}>
-
-      <Text>
-        Home Page
-      </Text>
-      <Link href="/about" style={button.button}>
-
-          <Text style={button.buttonText}>
-          About
-          </Text>
       
-      </Link>
+    
       <Link href="/atalhos" style={button.button}>
         <Text style={button.buttonText}>Atalhos</Text>
       </Link>
@@ -28,6 +20,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  homePage: {
+    fontSize: 24,
+    fontWeight: "bold",
+    alignItems: "baseline",
+    justifyContent: "center",
+  },
 });
 const button = StyleSheet.create({
   button: {
@@ -38,5 +36,13 @@ const button = StyleSheet.create({
   buttonText: {
     color: "white",
     fontSize: 16,
+  },
+});
+
+const cabecalho = StyleSheet.create({
+  cabecalho: {
+    backgroundColor: "#3f297d",
+    padding: 20,
+    
   },
 });
