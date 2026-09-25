@@ -21,16 +21,17 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/Logo-MaraGames.png"
+
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#8b0c08",
+          "image": "./assets/images/Splash-Screen-Vermelha.png",
+          "imageWidth": 402
         }
       ]
     ],
