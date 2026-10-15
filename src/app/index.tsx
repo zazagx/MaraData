@@ -15,10 +15,10 @@ export default function Home() {
     
     <View style={styles.homePage}>
       <View style={styles.buttonCard} >
-        <Link href="/novoparticipante" style={button.button}> Adicionar novo participante </Link>
+        <Link href="/(funcoes)/novoparticipante" style={button.button}> Adicionar novo participante </Link>
         <Link href="/filas" style={button.button}> Filas</Link>
         <Link href="/estatistica" style={button.button}> Estatisticas</Link>
-        <Link href="/eventos" style={button.button}> Eventos </Link>
+        <Link href="/(funcoes)/eventos" style={button.button}> Eventos </Link>
       </View>
     </View>
 </>
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   eventoCard:{
-    backgroundColor: "#4f297d",
+    backgroundColor: "#9e00fb",
     paddingVertical: 80,
     borderRadius: 20,
     marginTop: 20,
@@ -58,12 +58,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent:"center",
-    gap:"50"
+    gap: 50,
+    marginBottom: 50,
   }
 });
 const button = StyleSheet.create({
   button: {
-    backgroundColor: "#c32928",
+    backgroundColor: "#005bfb",
     width: "40%",
     paddingVertical: 40,
     paddingHorizontal: 20,

@@ -1,18 +1,43 @@
-import { Stack } from "expo-router";
+import { Drawer } from "expo-router/drawer";
 import { StyleSheet } from "react-native";
 
 export default function RootLayout() {
 
   return (
-    // <SafeAreaView style={styles.container}>
-    //   <View style={styles.header}>
-    //     <Text style={styles.headerText}>MaraData</Text>
-    //   </View>
-       <Stack />
-    //   <View style={styles.footer}>
-    //     <Text style={styles.footerText}>Footer</Text>
-    //   </View>
-    // </SafeAreaView>
+    <Drawer
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: "#8000ff",
+        },
+        headerTintColor: "#ffffff",
+        
+      }}
+    >
+      <Drawer.Screen
+        name="index"
+        options={{
+          title: "Beast Maragames",
+          drawerLabel: "Início",
+         
+        }}
+      />
+
+      <Drawer.Screen
+        name="(funcoes)"
+        options={{
+          headerShown: false,
+          drawerLabel: "Funcionalidades",
+          title: "Funcionalidades",
+        }}
+        />
+        <Drawer.Screen
+        name ="about"
+        options={{
+          title: "Sobre",
+          drawerLabel: "Sobre",
+        }}
+      />
+    </Drawer>
   );
 }
 
