@@ -27,6 +27,16 @@ export default function filas() {
         </View>
       </View>
       </View>
+
+        <View style={button.adicionarParticipante}>
+          {/* <Image source={require('../../components/icons/Plus_Black.png')} resizeMode="contain" style={button.imagemAdicionarParticipante}></Image> */}
+            <View>
+            <Text style={button.plusIcon}> 
+              +
+            </Text> 
+            </View>
+          <Text style={styles.text}> Adicionar participante</Text>       
+        </View>
       
 
       <View style={styles.secaoNovoParticipante}>
@@ -111,7 +121,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     margin: 20,
-    paddingTop: 50,
+    paddingTop: 20,
   },
 
   listaParticipantes:{
@@ -166,6 +176,30 @@ const button = StyleSheet.create({
     justifyContent: "center",
     gap: 20,
     paddingVertical: 40,
+  },
+  adicionarParticipante: {
+    flexDirection: "row",
+    gap: 30,
+    backgroundColor: "#ef1f23",
+    width: "40%",
+    marginTop: 20,
+    alignSelf: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  imagemAdicionarParticipante: {
+    width: 20,
+    height: 20,
+    resizeMode: "contain",
+  },
+  plusIcon: {
+    fontSize: 30,
+    color: "white",
   }
 });
   
