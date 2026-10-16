@@ -1,5 +1,6 @@
 import { Stack, router } from "expo-router";
-import { Pressable, Text } from "react-native";
+import { Image, Pressable } from "react-native";
+
 
 export default function FuncoesLayout() {
   return (
@@ -7,8 +8,12 @@ export default function FuncoesLayout() {
       screenOptions={{
         headerStyle: {
           backgroundColor: "#8000ff",
+          
         },
+        headerTitleAlign: "center",
         headerTintColor: "#ffffff",
+  
+
 
         // Botão para voltar à tela anterior.
         // Se não houver uma tela anterior, retorna à Home.
@@ -17,10 +22,14 @@ export default function FuncoesLayout() {
             onPress={() => router.replace("/")}
             style={{ marginLeft: 16 }}
           >
+
+            <Image source={require("../../components/icons/arrow_left.png")} style={{ width: 24, height: 24 }} resizeMode="contain">
+            </Image>
+
          
-            <Text style={{ color: "#ffffff", fontSize: 28 }}>
+            {/* <Text style={{ color: "#ffffff", fontSize: 28 }}>
               ‹
-            </Text>
+            </Text> */}
           </Pressable>
         ),
       }}
