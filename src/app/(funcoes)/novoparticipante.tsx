@@ -22,10 +22,14 @@ export default function novoparticipante() {
     })
  }
   return (
-    <View style={styles.container}>
-      <View style={styles.cadastroParticipante}>
-        <Text style={styles.textDesing}>Nome do participante </Text>
-        <TextInput placeholder="Digite o nome" 
+    <View style={styles.cadastroParticipante}>
+        <Text style={styles.textDesing}>
+           Nome do participante
+        </Text>
+         
+        <TextInput 
+      
+        placeholder="Digite o nome" 
           value={participante.nome}
           onChangeText={(texto)=> alterarCampo("nome", texto)}
           style={styles.inputBox}
@@ -66,7 +70,7 @@ export default function novoparticipante() {
           onChangeText={(texto) => alterarCampo("interesseProfissionalGames", texto)}
           style={styles.inputBox}
         />
-      </View>
+
       
     </View>
   )
@@ -79,25 +83,24 @@ const styles = StyleSheet.create({
   inputBox:{
     backgroundColor: "#d0d0d1b1",
     padding: 15,
-    marginTop: 5,
-    width:"50%",
-    borderRadius: 10
+    marginTop: 0,
+    width:"80%",
+    borderRadius: 10,
+    flexDirection: "row"
   },
   textDesing:{
     fontSize:16,
     fontWeight:"bold",
-    padding: 12
+    padding: 12,
+    textAlign: "left",
+    width: "85%"
   },
 
   cadastroParticipante:{
-  alignItems:"flex-start",
-  justifyContent:"center"
+  alignItems: "center"
+
 },
-  container:{
-    
 
-
-  }
 
 })
 

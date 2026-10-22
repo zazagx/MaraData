@@ -1,5 +1,6 @@
-import { Link } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
 
 export default function Home() {
   return (
@@ -15,10 +16,45 @@ export default function Home() {
     
     <View style={styles.homePage}>
       <View style={styles.buttonCard} >
-        <Link href="/(funcoes)/novoparticipante" style={button.button}> Adicionar novo participante </Link>
-        <Link href="/filas" style={button.button}> Filas</Link>
-        <Link href="/estatistica" style={button.button}> Estatisticas</Link>
-        <Link href="/(funcoes)/eventos" style={button.button}> Eventos </Link>
+
+      {/* Primeiro botao de participantes */}
+      <Pressable
+      onPress={() => router.push("/novoparticipante")}
+      style={button.button}
+      >
+        <Text style={button.buttonText}> 
+          Participantes
+        </Text>
+      </Pressable>
+
+      {/* Segundo botao de filas hehe */}
+       <Pressable
+      onPress={() => router.push("/filas")}
+      style={button.button}
+      >
+        <Text style={button.buttonText}> 
+          Filas
+        </Text>
+      </Pressable> 
+
+      {/* Terceiro botao de Estatistica    */}
+      <Pressable
+      onPress={() => router.push("/estatistica")}
+      style={button.button}
+      >
+        <Text style={button.buttonText}> 
+          Estatisticas
+        </Text>
+      </Pressable> 
+
+      <Pressable
+      onPress={() => router.push("/eventos")}
+      style={button.button}
+      >
+        <Text style={button.buttonText}> 
+          Eventos
+        </Text>
+      </Pressable> 
       </View>
     </View>
 </>
@@ -27,7 +63,10 @@ export default function Home() {
   );
 }
 
+
 const styles = StyleSheet.create({
+  
+  
   container: {
     flex: 2,
     alignItems: "center",
@@ -62,6 +101,7 @@ const styles = StyleSheet.create({
     marginBottom: 50,
   }
 });
+
 const button = StyleSheet.create({
   button: {
     backgroundColor: "#005bfb",
@@ -69,10 +109,14 @@ const button = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 20,
     borderRadius: 5,
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+
+    alignItems: "center",
     textAlign: "center"
     
   },
+  buttonText:{
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold"
+  }
 });
