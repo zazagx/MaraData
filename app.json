@@ -32,8 +32,8 @@
           "image": "./assets/images/Splash-Screen-Vermelha.png",
           "imageWidth": 402
         }
-      ],
-      "expo-sqlite"
+      ]
+
     ],
     "experiments": {
       "typedRoutes": true,
