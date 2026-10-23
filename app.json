@@ -22,7 +22,6 @@
     "web": {
       "output": "static",
       "favicon": "./assets/images/Logo-MaraGames.png"
-
     },
     "plugins": [
       "expo-router",
@@ -34,6 +33,8 @@
           "imageWidth": 402
         }
       ]
+
+
     ],
     "experiments": {
       "typedRoutes": true,
