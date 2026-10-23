@@ -1,6 +1,6 @@
+import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { useRouter } from 'expo-router'
 
 export default function novoparticipante() {
   const router = useRouter()
