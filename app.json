@@ -22,7 +22,6 @@
     "web": {
       "output": "static",
       "favicon": "./assets/images/Logo-MaraGames.png"
-
     },
     "plugins": [
       "expo-router",
@@ -33,7 +32,8 @@
           "image": "./assets/images/Splash-Screen-Vermelha.png",
           "imageWidth": 402
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
