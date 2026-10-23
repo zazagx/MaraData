@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -18,77 +19,117 @@ export default function Eventos() {
   // Estados dos campos do formulário
   const [nomeEvento, setNomeEvento] = useState('');
   const [localEvento, setLocalEvento] = useState('');
-  const [dataInicio, setDataInicio] = useState('');
-  const [dataTermino, setDataTermino] = useState('');
-  const [horarioInicio, setHorarioInicio] = useState('');
-  const [horarioTermino, setHorarioTermino] = useState('');
   const [descricao, setDescricao] = useState('');
   const [situacao, setSituacao] = useState<'agendado' | 'em_andamento'>('agendado');
 
+  // Estados de Datas e Horários como objetos Date
+  const [dataInicio, setDataInicio] = useState<Date | null>(null);
+  const [dataTermino, setDataTermino] = useState<Date | null>(null);
+  const [horarioInicio, setHorarioInicio] = useState<Date | null>(null);
+  const [horarioTermino, setHorarioTermino] = useState<Date | null>(null);
+
+  // Controle de visibilidade dos Pickers
+  const [pickerVisible, setPickerVisible] = useState<{
+    type: 'date' | 'time';
+    field: 'dataInicio' | 'dataTermino' | 'horarioInicio' | 'horarioTermino';
+  } | null>(null);
+
   // Estado para controlar os erros de validação
-  const [erros, setErros] = useState<{ [key: string]: boolean }>({});
+  const [erros, setErros] = useState<{ [key: string]: string | boolean }>({});
 
-  // Formatação de Data (DD/MM/AAAA)
-  const formatarData = (text: string) => {
-    const apenasNumeros = text.replace(/\D/g, '');
-    const numerosLimitados = apenasNumeros.slice(0, 8);
-
-    if (numerosLimitados.length <= 2) return numerosLimitados;
-    if (numerosLimitados.length <= 4)
-      return `${numerosLimitados.slice(0, 2)}/${numerosLimitados.slice(2)}`;
-    return `${numerosLimitados.slice(0, 2)}/${numerosLimitados.slice(2, 4)}/${numerosLimitados.slice(4)}`;
+  // Auxiliares de Formatação para exibição na tela
+  const formatarDataExibicao = (date: Date | null) => {
+    if (!date) return '';
+    const dia = String(date.getDate()).padStart(2, '0');
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const ano = date.getFullYear();
+    return `${dia}/${mes}/${ano}`;
   };
 
-  // Formatação de Horário (HH:MM)
-  const formatarHorario = (text: string) => {
-    const apenasNumeros = text.replace(/\D/g, '');
-    const numerosLimitados = apenasNumeros.slice(0, 4);
+  const formatarHorarioExibicao = (date: Date | null) => {
+    if (!date) return '';
+    const horas = String(date.getHours()).padStart(2, '0');
+    const minutos = String(date.getMinutes()).padStart(2, '0');
+    return `${horas}:${minutos}`;
+  };
 
-    if (numerosLimitados.length <= 2) return numerosLimitados;
-    return `${numerosLimitados.slice(0, 2)}:${numerosLimitados.slice(2)}`;
+  // Manipulador de mudança dos Pickers
+  const onChangePicker = (event: any, selectedDate?: Date) => {
+    const currentField = pickerVisible?.field;
+    setPickerVisible(null); // Fecha o picker no Android
+
+    if (event.type === 'set' && selectedDate && currentField) {
+      if (currentField === 'dataInicio') {
+        setDataInicio(selectedDate);
+        if (erros.dataInicio) setErros({ ...erros, dataInicio: false });
+      } else if (currentField === 'dataTermino') {
+        setDataTermino(selectedDate);
+        if (erros.dataTermino) setErros({ ...erros, dataTermino: false });
+      } else if (currentField === 'horarioInicio') {
+        setHorarioInicio(selectedDate);
+        if (erros.horarioInicio) setErros({ ...erros, horarioInicio: false });
+      } else if (currentField === 'horarioTermino') {
+        setHorarioTermino(selectedDate);
+        if (erros.horarioTermino) setErros({ ...erros, horarioTermino: false });
+      }
+    }
   };
 
   // Função de Validação e Envio
   const handleCadastrar = () => {
-    const novosErros: { [key: string]: boolean } = {};
+    const novosErros: { [key: string]: string | boolean } = {};
 
     // 1. Validação dos campos OBRIGATÓRIOS
-    if (!nomeEvento.trim()) novosErros.nomeEvento = true;
-    if (!localEvento.trim()) novosErros.localEvento = true;
-    if (dataInicio.length < 10) novosErros.dataInicio = true;
-    if (horarioInicio.length < 5) novosErros.horarioInicio = true;
+    if (!nomeEvento.trim()) novosErros.nomeEvento = 'Campo obrigatório';
+    if (!localEvento.trim()) novosErros.localEvento = 'Campo obrigatório';
+    if (!dataInicio) novosErros.dataInicio = 'Data de início obrigatória';
+    if (!horarioInicio) novosErros.horarioInicio = 'Horário de início obrigatório';
 
-    // 2. Validação dos campos OPCIONAIS (só valida se o utilizador digitou algo)
-    if (dataTermino.length > 0 && dataTermino.length < 10) {
-      novosErros.dataTermino = true;
-    }
-    if (horarioTermino.length > 0 && horarioTermino.length < 5) {
-      novosErros.horarioTermino = true;
+    // 2. Validação de COERÊNCIA LÓGICA (Datas)
+    if (dataInicio && dataTermino) {
+      // Zera as horas para comparar apenas os dias
+      const dInicio = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), dataInicio.getDate());
+      const dTermino = new Date(dataTermino.getFullYear(), dataTermino.getMonth(), dataTermino.getDate());
+
+      if (dTermino < dInicio) {
+        novosErros.dataTermino = 'A data de término não pode ser anterior à de início';
+      }
     }
 
-    // Atualiza o estado de erros
+    // 3. Validação de COERÊNCIA LÓGICA (Horários no mesmo dia)
+    if (dataInicio && horarioInicio && horarioTermino) {
+      const mesmoDia =
+        !dataTermino ||
+        (dataInicio.getFullYear() === dataTermino.getFullYear() &&
+          dataInicio.getMonth() === dataTermino.getMonth() &&
+          dataInicio.getDate() === dataTermino.getDate());
+
+      if (mesmoDia) {
+        const mInicio = horarioInicio.getHours() * 60 + horarioInicio.getMinutes();
+        const mTermino = horarioTermino.getHours() * 60 + horarioTermino.getMinutes();
+
+        if (mTermino <= mInicio) {
+          novosErros.horarioTermino = 'O horário de término deve ser após o de início';
+        }
+      }
+    }
+
     setErros(novosErros);
 
-    // Se houver algum erro, impede o cadastro e exibe alerta
     if (Object.keys(novosErros).length > 0) {
       Alert.alert(
-        'Atenção',
-        'Por favor, preencha corretamente todos os campos destacados em vermelho.'
+        'Verifique os dados',
+        'Existem campos obrigatórios ou incorretos destacados em vermelho.'
       );
       return;
     }
 
-    // Sucesso! Dados validados
     Alert.alert('Sucesso!', 'Evento cadastrado com sucesso.', [
       {
         text: 'OK',
         onPress: () => router.back(),
       },
     ]);
-  };
-
-  const handleCancelar = () => {
-    router.back();
   };
 
   return (
@@ -98,10 +139,7 @@ export default function Eventos() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         keyboardVerticalOffset={Platform.OS === 'android' ? 90 : 0}
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {/* Cabeçalho */}
           <View style={styles.topSection}>
             <Ionicons name="game-controller-outline" size={56} color="#000" />
@@ -114,7 +152,7 @@ export default function Eventos() {
             Nome do Evento <Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, erros.nomeEvento && styles.inputError]}
+            style={[styles.input, !!erros.nomeEvento && styles.inputError]}
             placeholder="Ex: Arena Gamer São Luís"
             placeholderTextColor="#999"
             value={nomeEvento}
@@ -123,16 +161,14 @@ export default function Eventos() {
               if (erros.nomeEvento) setErros({ ...erros, nomeEvento: false });
             }}
           />
-          {erros.nomeEvento && (
-            <Text style={styles.errorText}>Campo obrigatório</Text>
-          )}
+          {erros.nomeEvento && <Text style={styles.errorText}>{String(erros.nomeEvento)}</Text>}
 
           {/* Campo: Local do Evento */}
           <Text style={styles.label}>
             Local do evento <Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, erros.localEvento && styles.inputError]}
+            style={[styles.input, !!erros.localEvento && styles.inputError]}
             placeholder="Ex: Arena Gamer São Luís"
             placeholderTextColor="#999"
             value={localEvento}
@@ -141,129 +177,75 @@ export default function Eventos() {
               if (erros.localEvento) setErros({ ...erros, localEvento: false });
             }}
           />
-          {erros.localEvento && (
-            <Text style={styles.errorText}>Campo obrigatório</Text>
-          )}
+          {erros.localEvento && <Text style={styles.errorText}>{String(erros.localEvento)}</Text>}
 
           {/* Linha 1: Datas */}
           <View style={styles.row}>
+            {/* Data de Início */}
             <View style={styles.halfColumn}>
               <Text style={styles.label}>
                 Data de início <Text style={styles.requiredStar}>*</Text>
               </Text>
-              <View
-                style={[
-                  styles.inputWithIcon,
-                  erros.dataInicio && styles.inputError,
-                ]}
+              <TouchableOpacity
+                style={[styles.inputWithIcon, !!erros.dataInicio && styles.inputError]}
+                onPress={() => setPickerVisible({ type: 'date', field: 'dataInicio' })}
               >
-                <TextInput
-                  style={styles.flexInput}
-                  placeholder="DD/MM/AAAA"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  maxLength={10}
-                  value={dataInicio}
-                  onChangeText={(text) => {
-                    setDataInicio(formatarData(text));
-                    if (erros.dataInicio)
-                      setErros({ ...erros, dataInicio: false });
-                  }}
-                />
+                <Text style={dataInicio ? styles.inputText : styles.placeholderText}>
+                  {formatarDataExibicao(dataInicio) || 'DD/MM/AAAA'}
+                </Text>
                 <Ionicons name="calendar-outline" size={20} color="#555" />
-              </View>
-              {erros.dataInicio && (
-                <Text style={styles.errorText}>Data incompleta</Text>
-              )}
+              </TouchableOpacity>
+              {erros.dataInicio && <Text style={styles.errorText}>{String(erros.dataInicio)}</Text>}
             </View>
 
+            {/* Data de Término */}
             <View style={styles.halfColumn}>
               <Text style={styles.label}>Data de término</Text>
-              <View
-                style={[
-                  styles.inputWithIcon,
-                  erros.dataTermino && styles.inputError,
-                ]}
+              <TouchableOpacity
+                style={[styles.inputWithIcon, !!erros.dataTermino && styles.inputError]}
+                onPress={() => setPickerVisible({ type: 'date', field: 'dataTermino' })}
               >
-                <TextInput
-                  style={styles.flexInput}
-                  placeholder="DD/MM/AAAA"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  maxLength={10}
-                  value={dataTermino}
-                  onChangeText={(text) => {
-                    setDataTermino(formatarData(text));
-                    if (erros.dataTermino)
-                      setErros({ ...erros, dataTermino: false });
-                  }}
-                />
+                <Text style={dataTermino ? styles.inputText : styles.placeholderText}>
+                  {formatarDataExibicao(dataTermino) || 'DD/MM/AAAA'}
+                </Text>
                 <Ionicons name="calendar-outline" size={20} color="#555" />
-              </View>
-              {erros.dataTermino && (
-                <Text style={styles.errorText}>Data incompleta</Text>
-              )}
+              </TouchableOpacity>
+              {erros.dataTermino && <Text style={styles.errorText}>{String(erros.dataTermino)}</Text>}
             </View>
           </View>
 
           {/* Linha 2: Horários */}
           <View style={styles.row}>
+            {/* Horário de Início */}
             <View style={styles.halfColumn}>
               <Text style={styles.label}>
                 Horário de início <Text style={styles.requiredStar}>*</Text>
               </Text>
-              <View
-                style={[
-                  styles.inputWithIcon,
-                  erros.horarioInicio && styles.inputError,
-                ]}
+              <TouchableOpacity
+                style={[styles.inputWithIcon, !!erros.horarioInicio && styles.inputError]}
+                onPress={() => setPickerVisible({ type: 'time', field: 'horarioInicio' })}
               >
-                <TextInput
-                  style={styles.flexInput}
-                  placeholder="00:00"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  maxLength={5}
-                  value={horarioInicio}
-                  onChangeText={(text) => {
-                    setHorarioInicio(formatarHorario(text));
-                    if (erros.horarioInicio)
-                      setErros({ ...erros, horarioInicio: false });
-                  }}
-                />
+                <Text style={horarioInicio ? styles.inputText : styles.placeholderText}>
+                  {formatarHorarioExibicao(horarioInicio) || '00:00'}
+                </Text>
                 <Ionicons name="time-outline" size={20} color="#555" />
-              </View>
-              {erros.horarioInicio && (
-                <Text style={styles.errorText}>Hora incompleta</Text>
-              )}
+              </TouchableOpacity>
+              {erros.horarioInicio && <Text style={styles.errorText}>{String(erros.horarioInicio)}</Text>}
             </View>
 
+            {/* Horário de Término */}
             <View style={styles.halfColumn}>
               <Text style={styles.label}>Horário de término</Text>
-              <View
-                style={[
-                  styles.inputWithIcon,
-                  erros.horarioTermino && styles.inputError,
-                ]}
+              <TouchableOpacity
+                style={[styles.inputWithIcon, !!erros.horarioTermino && styles.inputError]}
+                onPress={() => setPickerVisible({ type: 'time', field: 'horarioTermino' })}
               >
-                <TextInput
-                  style={styles.flexInput}
-                  placeholder="00:00"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  maxLength={5}
-                  value={horarioTermino}
-                  onChangeText={(text) => {
-                    setHorarioTermino(formatarHorario(text));
-                    if (erros.horarioTermino)
-                      setErros({ ...erros, horarioTermino: false });
-                  }}
-                />
+                <Text style={horarioTermino ? styles.inputText : styles.placeholderText}>
+                  {formatarHorarioExibicao(horarioTermino) || '00:00'}
+                </Text>
                 <Ionicons name="time-outline" size={20} color="#555" />
-              </View>
-              {erros.horarioTermino && (
-                <Text style={styles.errorText}>Hora incompleta</Text>
-              )}
+              </TouchableOpacity>
+              {erros.horarioTermino && <Text style={styles.errorText}>{String(erros.horarioTermino)}</Text>}
             </View>
           </View>
 
@@ -284,10 +266,7 @@ export default function Eventos() {
           <Text style={styles.label}>Situação do evento</Text>
           <View style={styles.statusRow}>
             <TouchableOpacity
-              style={[
-                styles.statusChip,
-                situacao === 'agendado' && styles.statusActiveChip,
-              ]}
+              style={[styles.statusChip, situacao === 'agendado' && styles.statusActiveChip]}
               onPress={() => setSituacao('agendado')}
             >
               <Ionicons
@@ -295,38 +274,21 @@ export default function Eventos() {
                 size={20}
                 color={situacao === 'agendado' ? '#FFF' : '#666'}
               />
-              <Text
-                style={[
-                  styles.statusText,
-                  situacao === 'agendado' && styles.statusActiveText,
-                ]}
-              >
+              <Text style={[styles.statusText, situacao === 'agendado' && styles.statusActiveText]}>
                 Agendado
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
-                styles.statusChip,
-                situacao === 'em_andamento' && styles.statusActiveChip,
-              ]}
+              style={[styles.statusChip, situacao === 'em_andamento' && styles.statusActiveChip]}
               onPress={() => setSituacao('em_andamento')}
             >
               <Ionicons
-                name={
-                  situacao === 'em_andamento'
-                    ? 'checkmark-circle'
-                    : 'ellipse-outline'
-                }
+                name={situacao === 'em_andamento' ? 'checkmark-circle' : 'ellipse-outline'}
                 size={20}
                 color={situacao === 'em_andamento' ? '#FFF' : '#666'}
               />
-              <Text
-                style={[
-                  styles.statusText,
-                  situacao === 'em_andamento' && styles.statusActiveText,
-                ]}
-              >
+              <Text style={[styles.statusText, situacao === 'em_andamento' && styles.statusActiveText]}>
                 Em andamento
               </Text>
             </TouchableOpacity>
@@ -338,11 +300,30 @@ export default function Eventos() {
           </TouchableOpacity>
 
           {/* Botão Cancelar */}
-          <TouchableOpacity style={styles.cancelButton} onPress={handleCancelar}>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
             <Text style={styles.cancelButtonText}>Cancelar</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* RENDERIZAÇÃO DO PICKER NATIVO DE DATA E HORA */}
+      {pickerVisible && (
+        <DateTimePicker
+          value={
+            pickerVisible.field === 'dataInicio'
+              ? dataInicio || new Date()
+              : pickerVisible.field === 'dataTermino'
+              ? dataTermino || new Date()
+              : pickerVisible.field === 'horarioInicio'
+              ? horarioInicio || new Date()
+              : horarioTermino || new Date()
+          }
+          mode={pickerVisible.type}
+          is24Hour={true}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onChangePicker}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -417,9 +398,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  flexInput: {
-    flex: 1,
+  inputText: {
     fontSize: 14,
+    color: '#000',
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: '#999',
   },
   textArea: {
     height: 100,
