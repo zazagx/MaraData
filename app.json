@@ -32,9 +32,9 @@
           "image": "./assets/images/Splash-Screen-Vermelha.png",
           "imageWidth": 402
         }
-      ]
-
-
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
