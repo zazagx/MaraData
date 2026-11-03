@@ -82,10 +82,11 @@ const styles = StyleSheet.create({
   },
   eventoCard:{
     backgroundColor: "#9e00fb",
-    paddingVertical: 80,
+    paddingVertical: 25,
     borderRadius: 20,
     marginTop: 20,
     width: "70%",
+    height: "20%",
     alignSelf: "center",
     alignItems: "center",
   },

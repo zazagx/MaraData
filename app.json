@@ -32,9 +32,8 @@
           "image": "./assets/images/Splash-Screen-Vermelha.png",
           "imageWidth": 402
         }
-      ]
-
-
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
