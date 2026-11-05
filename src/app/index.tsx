@@ -19,7 +19,7 @@ export default function Home() {
 
       {/* Primeiro botao de participantes */}
       <Pressable
-      onPress={() => router.push("/novoparticipante")}
+      onPress={() => router.push("/participantescadastrados")}
       style={button.button}
       >
         <Text style={button.buttonText}> 

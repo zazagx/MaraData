@@ -69,10 +69,10 @@ export default function ConfirmacaoCadastro() {
 
       <Pressable
         style={styles.botao}
-        onPress={() => router.replace('/novoparticipante')}
+        onPress={() => router.replace('/participantescadastrados')}
       >
         <Text style={styles.textoBotao}>
-          Cadastrar outro participante
+          Voltar para a lista de participantes
         </Text>
       </Pressable>
 
