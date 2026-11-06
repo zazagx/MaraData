@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-export default function filas() {
+export default function gerenciarFila() {
   return (
     <View>
       <View style={styles.container}>
@@ -14,7 +14,7 @@ export default function filas() {
         <View style={styles.conteudoSenha}>
           <Image 
           style={styles.image}
-          source={require('../../components/icons/controller.png')}
+          source={require('../../../components/icons/controller.png')}
           resizeMode="contain"
           >
   
@@ -40,7 +40,7 @@ export default function filas() {
       
 
       <View style={styles.secaoNovoParticipante}>
-        <Image source={require('../../components/icons/group.png')} style={styles.imageParticipante} ></Image>
+        <Image source={require('../../../components/icons/group.png')} style={styles.imageParticipante} ></Image>
         <Text style={styles.proximoParticipanteText}>Próximo participante</Text>
 
 

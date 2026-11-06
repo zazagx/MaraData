@@ -28,9 +28,9 @@ export default function FuncoesLayout() {
       <Stack.Screen
         name="filas"
         options={{
-          title: "Filas",
+          headerShown: false,
         }}
-      />
+      />  
 
       <Stack.Screen
         name="estatistica"
