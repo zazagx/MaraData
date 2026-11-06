@@ -6,13 +6,14 @@ export default function Home() {
   return (
 
 <>
-    <View style={styles.container}>
-      <View style={styles.eventoCard}>
-        <Text style={styles.eventoCardText}>Nome do evento</Text>
-        <Text style={styles.eventoCardText}>Local</Text>
-        <Text style={styles.eventoCardText}>● Evento ativo</Text>
-      </View>
-    </View>
+    <Pressable
+      style={styles.eventoCard}
+      onPress={() => router.push("/(funcoes)/eventos/detalhes")}
+    >
+      <Text style={styles.eventoCardText}>Nome do evento</Text>
+      <Text style={styles.eventoCardText}>Local</Text>
+      <Text style={styles.eventoCardText}>● Evento ativo</Text>
+    </Pressable> 
     
     <View style={styles.homePage}>
       <View style={styles.buttonCard} >

@@ -78,7 +78,7 @@ export default function Eventos() {
     return `${numerosLimitados.slice(0, 2)}:${numerosLimitados.slice(2)}`;
   };
 
-  // Autocompletar Horário ao sair do campo (ex: "13" vira "13:00")
+  // Ajuste do horário ao sair do campo
   const handleBlurHorario = (
     horarioAtual: string,
     setHora: (val: string) => void
@@ -90,7 +90,7 @@ export default function Eventos() {
     }
   };
 
-  // Validação de Hora Real (00h a 23h / 00m a 59m)
+  // Validação de horário
   const validarHorarioValido = (horarioStr: string) => {
     if (horarioStr.length < 5) return false;
     const [horas, minutos] = horarioStr.split(':').map(Number);
@@ -194,7 +194,7 @@ export default function Eventos() {
     setCalendarioVisivel(false);
   };
 
-  // Função de Validação e Envio (simulação somente no front-end)
+  // Validação e cadastro do evento
   const handleCadastrar = () => {
     const novosErros: { [key: string]: string | boolean } = {};
 
@@ -274,12 +274,26 @@ export default function Eventos() {
     }
 
     Alert.alert('Sucesso!', 'Evento cadastrado com sucesso.', [
-      {
-        text: 'OK',
-        onPress: () => router.back(),
-      },
-    ]);
-  };
+    {
+      text: 'OK',
+      onPress: () => {
+      router.push({
+        pathname: "/(funcoes)/eventos/detalhes",
+        params: {
+          nomeEvento: nomeEvento,
+          localEvento: localEvento,
+          dataInicio: dataInicio,
+          dataTermino: dataTermino,
+          horarioInicio: horarioInicio,
+          horarioTermino: horarioTermino,
+          descricao: descricao,
+          situacao: situacao,
+        },
+      });
+    },
+  },
+]);
+}
 
   return (
     <SafeAreaView style={styles.container}>
