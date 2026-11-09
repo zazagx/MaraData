@@ -1,18 +1,18 @@
 import {
-    buscarParticipantes,
-    type Participante
+  buscarParticipantes,
+  type Participante
 } from '@/features/armazenamentoParticipantes'
 
 import { Stack, useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 
 import {
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native'
 
 

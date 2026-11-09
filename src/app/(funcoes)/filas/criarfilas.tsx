@@ -1,265 +1,93 @@
-import { salvarFila } from '../../../features/armazenamentofilas'
-
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
-
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
-
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { salvarFila } from '../../../features/armazenamentofilas';
 
 export default function CriarFila() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    nomeEvento?: string;
+    localEvento?: string;
+    situacao?: string;
+  }>();
+  const [nome, setNome] = useState('');
+  const [erroNome, setErroNome] = useState('');
 
-  const router = useRouter()
-
-  const [nome, setNome] = useState('')
-  const [evento, setEvento] = useState('')
-
-  const [erros, setErros] = useState({
-    nome: '',
-    evento: '',
-  })
-
+  const nomeEvento = params.nomeEvento || '';
+  const localEvento = params.localEvento || '';
+  const eventoAtivo = params.situacao === 'em_andamento' && nomeEvento !== '' && localEvento !== '';
 
   function cadastrarFila() {
-
-    const novosErros = {
-      nome: '',
-      evento: '',
-    }
-
+    if (!eventoAtivo) return;
     if (nome.trim() === '') {
-      novosErros.nome = 'Digite o nome da fila.'
+      setErroNome('Digite o nome da fila.');
+      return;
     }
 
-    if (evento.trim() === '') {
-      novosErros.evento = 'Informe o evento relacionado à fila.'
-    }
-
-    setErros(novosErros)
-
-    const temErro = Object.values(novosErros).some(
-      (erro) => erro !== ''
-    )
-
-    if (temErro) return
-
-
-    // Saves the new queue in shared memory.
-    salvarFila({
+    const novaFila = salvarFila({
       nome: nome.trim(),
-      evento: evento.trim(),
-      status: 'ativa',
-      quantidadeAguardando: 0,
-    })
+      evento: nomeEvento,
+      localEvento,
+    });
 
-    // Returns to the queue list.
-    router.replace('/filas')
-
+    router.replace({ pathname: '/filas/gerenciarfilas', params: { filaId: novaFila.id } });
   }
 
-
   return (
-
-    <ScrollView
-      contentContainerStyle={styles.conteudo}
-      keyboardShouldPersistTaps="handled"
-    >
-
+    <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
       <View style={styles.formulario}>
+        <Text style={styles.titulo}>Nova fila</Text>
+        <Text style={styles.descricao}>Crie uma fila vinculada ao evento em andamento.</Text>
 
-        <Text style={styles.titulo}>
-          Nova fila
-        </Text>
+        <Text style={styles.label}>Evento relacionado</Text>
+        <View style={styles.cardEvento}>
+          <Text style={styles.nomeEvento}>{nomeEvento || 'Nenhum evento selecionado'}</Text>
+          <Text style={styles.localEvento}>{localEvento || 'Abra esta tela pelos detalhes de um evento em andamento.'}</Text>
+          {!eventoAtivo && <Text style={styles.erroEvento}>É necessário selecionar um evento com situação “Em andamento”.</Text>}
+        </View>
 
-        <Text style={styles.descricao}>
-          Preencha as informações para criar uma nova fila.
-        </Text>
-
-
-        {/* QUEUE NAME */}
-
-        <Text style={styles.label}>
-          Nome da fila
-        </Text>
-
+        <Text style={styles.label}>Nome da fila</Text>
         <TextInput
           style={styles.input}
           placeholder="Ex.: Console, Just Dance..."
           placeholderTextColor="#888"
           value={nome}
-          onChangeText={(texto) => {
-            setNome(texto)
-            setErros({ ...erros, nome: '' })
-          }}
+          onChangeText={(texto) => { setNome(texto); setErroNome(''); }}
         />
-
-        {erros.nome !== '' && (
-          <Text style={styles.textoErro}>
-            {erros.nome}
-          </Text>
-        )}
-
-
-        {/* EVENT */}
-
-        <Text style={styles.label}>
-          Evento relacionado
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Ex.: Arena Games 2026"
-          placeholderTextColor="#888"
-          value={evento}
-          onChangeText={(texto) => {
-            setEvento(texto)
-            setErros({ ...erros, evento: '' })
-          }}
-        />
-
-        {erros.evento !== '' && (
-          <Text style={styles.textoErro}>
-            {erros.evento}
-          </Text>
-        )}
-
-
-        {/* INFORMATION */}
+        {erroNome !== '' && <Text style={styles.textoErro}>{erroNome}</Text>}
 
         <View style={styles.aviso}>
-          <Text style={styles.avisoTexto}>
-            A nova fila será criada com o status Ativa e estará disponível
-            para receber participantes.
-          </Text>
+          <Text style={styles.avisoTexto}>A fila será criada como ativa e poderá receber participantes cadastrados.</Text>
         </View>
 
-
-        {/* CREATE BUTTON */}
-
-        <Pressable
-          style={styles.botao}
-          onPress={cadastrarFila}
-        >
-          <Text style={styles.textoBotao}>
-            Criar fila
-          </Text>
+        <Pressable style={[styles.botao, !eventoAtivo && styles.botaoDesabilitado]} onPress={cadastrarFila} disabled={!eventoAtivo}>
+          <Text style={styles.textoBotao}>Criar fila</Text>
         </Pressable>
-
-
-        {/* CANCEL BUTTON */}
-
-        <Pressable
-          style={styles.botaoCancelar}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.textoCancelar}>
-            Cancelar
-          </Text>
+        <Pressable style={styles.botaoCancelar} onPress={() => router.back()}>
+          <Text style={styles.textoCancelar}>Cancelar</Text>
         </Pressable>
-
       </View>
-
     </ScrollView>
-
-  )
+  );
 }
 
-
 const styles = StyleSheet.create({
-
-  conteudo: {
-    flexGrow: 1,
-    backgroundColor: '#f1f1f1',
-    padding: 20,
-  },
-
-  formulario: {
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-    paddingVertical: 15,
-  },
-
-  titulo: {
-    fontSize: 23,
-    fontWeight: 'bold',
-    color: '#25234c',
-    marginBottom: 8,
-  },
-
-  descricao: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 25,
-  },
-
-  label: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#25234c',
-    marginBottom: 10,
-    marginTop: 15,
-  },
-
-  input: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#dddddd',
-    fontSize: 15,
-    color: '#222222',
-  },
-
-  textoErro: {
-    color: '#ff002f',
-    fontSize: 13,
-    marginTop: 5,
-  },
-
-  aviso: {
-    backgroundColor: '#eee5ff',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 25,
-  },
-
-  avisoTexto: {
-    color: '#5c3290',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-
-  botao: {
-    backgroundColor: '#8000ff',
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 25,
-  },
-
-  textoBotao: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  botaoCancelar: {
-    padding: 15,
-    alignItems: 'center',
-    marginTop: 5,
-  },
-
-  textoCancelar: {
-    color: '#666666',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-
-})
+  conteudo: { flexGrow: 1, backgroundColor: '#f1f1f1', padding: 20 },
+  formulario: { width: '100%', maxWidth: 600, alignSelf: 'center', paddingVertical: 15 },
+  titulo: { fontSize: 23, fontWeight: 'bold', color: '#25234c', marginBottom: 8 },
+  descricao: { fontSize: 14, color: '#666', marginBottom: 25 },
+  label: { fontSize: 15, fontWeight: 'bold', color: '#25234c', marginBottom: 10, marginTop: 15 },
+  cardEvento: { backgroundColor: '#eee5ff', padding: 15, borderRadius: 10 },
+  nomeEvento: { color: '#25234c', fontSize: 15, fontWeight: 'bold' },
+  localEvento: { color: '#666', fontSize: 13, marginTop: 5 },
+  erroEvento: { color: '#D92D45', fontSize: 12, marginTop: 9, lineHeight: 18 },
+  input: { backgroundColor: '#ffffff', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#dddddd', fontSize: 15, color: '#222222' },
+  textoErro: { color: '#ff002f', fontSize: 13, marginTop: 5 },
+  aviso: { backgroundColor: '#eee5ff', padding: 15, borderRadius: 10, marginTop: 25 },
+  avisoTexto: { color: '#5c3290', fontSize: 13, lineHeight: 20 },
+  botao: { backgroundColor: '#8000ff', padding: 16, borderRadius: 10, alignItems: 'center', marginTop: 25 },
+  botaoDesabilitado: { opacity: 0.45 },
+  textoBotao: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
+  botaoCancelar: { padding: 15, alignItems: 'center', marginTop: 5 },
+  textoCancelar: { color: '#666666', fontSize: 15, fontWeight: 'bold' },
+});

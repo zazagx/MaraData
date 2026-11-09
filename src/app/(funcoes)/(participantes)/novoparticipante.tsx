@@ -8,6 +8,8 @@ import {
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 
+import { adicionarParticipanteAFila } from '@/features/armazenamentofilas'
+import { useLocalSearchParams } from 'expo-router'
 import {
   Modal,
   Platform,
@@ -18,7 +20,6 @@ import {
   TextInput,
   View
 } from 'react-native'
-
 
 // Load the native date picker only on mobile platforms.
 // The web version will use a regular text field instead.
@@ -219,6 +220,7 @@ function CampoSimNao({
 export default function novoparticipante() {
 
   const router = useRouter()
+  const params = useLocalSearchParams<{ origem?: string; filaId?: string }>()
 
   const [participante, setParticipante] = useState<Participante>({
     nome: '',
@@ -466,16 +468,41 @@ export default function novoparticipante() {
     )
 
 
-    if (!temErro) {
+if (!temErro) {
 
-      salvarParticipante({
-        ...participante,
-        nome: participante.nome.trim()
-      })
+  const participanteSalvo = {
+    ...participante,
+    nome: participante.nome.trim()
+  }
 
-      router.replace('/confirmacaoCadastroParticipante')
+  salvarParticipante(participanteSalvo)
 
-    }
+  // Se o cadastro começou pela tela de filas,
+  // adiciona o participante diretamente à fila.
+  if (params.origem === 'fila' && params.filaId) {
+
+    adicionarParticipanteAFila(params.filaId, {
+      nome: participanteSalvo.nome,
+      dataNascimento: participanteSalvo.dataNascimento,
+      jogos: participanteSalvo.jogos,
+    })
+
+    router.replace({
+      pathname: '/confirmacaoCadastroParticipante',
+      params: {
+        origem: 'fila',
+        filaId: params.filaId
+      },
+    })
+
+  } else {
+
+    // Cadastro realizado pela tela normal de participantes.
+    router.replace('/confirmacaoCadastroParticipante')
+
+  }
+
+}
 
   }
 

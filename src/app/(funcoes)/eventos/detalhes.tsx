@@ -46,14 +46,21 @@ export default function DetalhesEvento() {
   }
 
   function acessarTela(tela: string) {
-    if (tela === "participantes") {
-      router.push("/participantescadastrados");
-    } else if (tela === "filas") {
-      router.push("/filas");
-    } else if (tela === "estatisticas") {
-      router.push("/estatistica");
-    }
+  if (tela === "participantes") {
+    router.push("/participantescadastrados");
+  } else if (tela === "filas") {
+    router.push({
+      pathname: "/filas",
+      params: {
+        nomeEvento,
+        localEvento,
+        situacao,
+      },
+    });
+  } else if (tela === "estatisticas") {
+    router.push("/estatistica");
   }
+}
 
   return (
     <ScrollView
