@@ -1,45 +1,29 @@
-import { Stack, router } from "expo-router";
-import { Image, Pressable } from "react-native";
-
+import { Stack } from "expo-router";
 
 export default function FuncoesLayout() {
+
   return (
+
     <Stack
       screenOptions={{
         headerStyle: {
           backgroundColor: "#8000ff",
-          
         },
+
         headerTitleAlign: "center",
         headerTintColor: "#ffffff",
-  
-
-
-        // Botão para voltar à tela anterior.
-        // Se não houver uma tela anterior, retorna à Home.
-        headerLeft: () => (
-          <Pressable
-            onPress={() => router.replace("/")}
-            style={{ marginLeft: 16 }}
-          >
-
-            <Image source={require("../../components/icons/arrow_left.png")} style={{ width: 24, height: 24 }} resizeMode="contain">
-            </Image>
-
-         
-            {/* <Text style={{ color: "#ffffff", fontSize: 28 }}>
-              ‹
-            </Text> */}
-          </Pressable>
-        ),
       }}
     >
+
+      {/* PARTICIPANT SCREENS */}
       <Stack.Screen
-        name="novoparticipante"
+        name="(participantes)"
         options={{
-          title: "Cadastrar participante",
+          headerShown: false,
         }}
       />
+
+      {/* OTHER FUNCTIONALITIES */}
 
       <Stack.Screen
         name="eventos/detalhes"
@@ -58,9 +42,9 @@ export default function FuncoesLayout() {
       <Stack.Screen
         name="filas"
         options={{
-          title: "Filas",
+          headerShown: false,
         }}
-      />
+      />  
 
       <Stack.Screen
         name="estatistica"
@@ -75,6 +59,9 @@ export default function FuncoesLayout() {
           title: "Eventos",
         }}
       />
+
     </Stack>
+
   );
+
 }

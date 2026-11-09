@@ -33,6 +33,8 @@
           "imageWidth": 402
         }
       ],
+      "expo-image",
+      "expo-web-browser",
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
