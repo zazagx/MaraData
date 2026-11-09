@@ -14,29 +14,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+// Use the same native date picker used in the participant form.
+// On web, dates are entered manually as DD/MM/AAAA.
+const DatePickerModule: any = Platform.OS === 'web'
+  ? null
+  : require('@react-native-community/datetimepicker');
 
-// Configuração do calendário em português
-LocaleConfig.locales['pt-br'] = {
-  monthNames: [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril',
-    'Maio', 'Junho', 'Julho', 'Agosto',
-    'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-  ],
-  monthNamesShort: [
-    'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
-  ],
-  dayNames: [
-    'Domingo', 'Segunda-feira', 'Terça-feira',
-    'Quarta-feira', 'Quinta-feira', 'Sexta-feira',
-    'Sábado',
-  ],
-  dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-  today: 'Hoje',
-};
-
-LocaleConfig.defaultLocale = 'pt-br';
+const DateTimePicker = DatePickerModule?.default;
+const DateTimePickerAndroid = DatePickerModule?.DateTimePickerAndroid;
 
 type CampoData = 'inicio' | 'termino';
 
@@ -57,6 +42,7 @@ export default function Eventos() {
   // Estados do calendário visual
   const [calendarioVisivel, setCalendarioVisivel] = useState(false);
   const [campoDataAtivo, setCampoDataAtivo] = useState<CampoData>('inicio');
+  const [dataTemporaria, setDataTemporaria] = useState(new Date());
 
   // Formatação com Máscara de Data (DD/MM/AAAA)
   const formatarData = (text: string) => {
@@ -123,41 +109,38 @@ export default function Eventos() {
     return horas * 60 + minutos;
   };
 
-  // Abre o calendário para o campo selecionado
-  const abrirCalendario = (campo: CampoData) => {
-    setCampoDataAtivo(campo);
-    setCalendarioVisivel(true);
+  // Converts a local Date to YYYY-MM-DD without timezone conversion.
+  const dataParaISO = (data: Date) => {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
   };
 
-  // Converte DD/MM/AAAA para AAAA-MM-DD, formato do calendário
+  // Converts YYYY-MM-DD into a local Date.
+  const ISOParaData = (valor: string) => {
+    const [ano, mes, dia] = valor.split('-').map(Number);
+    return new Date(ano, mes - 1, dia);
+  };
+
+  // Converts DD/MM/YYYY into YYYY-MM-DD for reliable date comparisons.
   const converterParaFormatoCalendario = (dataStr: string) => {
     if (!validarDataValida(dataStr)) {
-      const hoje = new Date();
-      const ano = hoje.getFullYear();
-      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-      const dia = String(hoje.getDate()).padStart(2, '0');
-      return `${ano}-${mes}-${dia}`;
+      return dataParaISO(new Date());
     }
 
     const [dia, mes, ano] = dataStr.split('/');
     return `${ano}-${mes}-${dia}`;
   };
 
-  // Retorna a data atual do aparelho no formato AAAA-MM-DD (data local).
-  const obterHojeCalendario = () => {
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    const dia = String(hoje.getDate()).padStart(2, '0');
-    return `${ano}-${mes}-${dia}`;
-  };
+  // Today's date in local YYYY-MM-DD format.
+  const obterHojeCalendario = () => dataParaISO(new Date());
 
-  // O início nunca pode ser anterior a hoje. O término também não pode
-  // ser anterior a hoje nem à data de início, quando ela já foi escolhida.
-  const obterDataMinimaCalendario = () => {
+  // Start cannot be before today. End cannot be before today or the start date.
+  const obterDataMinimaISO = (campo: CampoData) => {
     const hoje = obterHojeCalendario();
 
-    if (campoDataAtivo === 'inicio') return hoje;
+    if (campo === 'inicio') return hoje;
 
     if (validarDataValida(dataInicio)) {
       const inicioISO = converterParaFormatoCalendario(dataInicio);
@@ -167,31 +150,83 @@ export default function Eventos() {
     return hoje;
   };
 
-  // Ao abrir, não navega para um mês passado caso a data salva seja inválida
-  // para a regra atual de datas mínimas.
-  const obterDataSelecionada = () => {
-    const dataAtual = campoDataAtivo === 'inicio' ? dataInicio : dataTermino;
-    const dataISO = converterParaFormatoCalendario(dataAtual);
-    const dataMinima = obterDataMinimaCalendario();
-    return dataISO < dataMinima ? dataMinima : dataISO;
+  const obterDataMinima = (campo: CampoData) => {
+    return ISOParaData(obterDataMinimaISO(campo));
   };
 
-  // Preenche o campo após a seleção; bloqueia também seleções anteriores ao mínimo.
-  const selecionarData = (dataString: string) => {
-    if (dataString < obterDataMinimaCalendario()) return;
+  // Gets the current value for the selected field, or its minimum date.
+  const obterDataInicial = (campo: CampoData) => {
+    const valorAtual = campo === 'inicio' ? dataInicio : dataTermino;
+    const valorISO = validarDataValida(valorAtual)
+      ? converterParaFormatoCalendario(valorAtual)
+      : obterDataMinimaISO(campo);
 
-    const [ano, mes, dia] = dataString.split('-');
-    const dataFormatada = `${dia}/${mes}/${ano}`;
+    const minimoISO = obterDataMinimaISO(campo);
+    return ISOParaData(valorISO < minimoISO ? minimoISO : valorISO);
+  };
+
+  // Applies a selected date to the appropriate field.
+  const selecionarData = (dataSelecionada: Date) => {
+    const dataISO = dataParaISO(dataSelecionada);
+
+    // Extra check so dates before the minimum are never accepted.
+    if (dataISO < obterDataMinimaISO(campoDataAtivo)) return;
+
+    const dataFormatada = `${String(dataSelecionada.getDate()).padStart(2, '0')}/${String(
+      dataSelecionada.getMonth() + 1
+    ).padStart(2, '0')}/${dataSelecionada.getFullYear()}`;
 
     if (campoDataAtivo === 'inicio') {
       setDataInicio(dataFormatada);
-      setErros((errosAtuais) => ({ ...errosAtuais, dataInicio: false }));
+      setErros((anteriores) => ({ ...anteriores, dataInicio: false }));
     } else {
       setDataTermino(dataFormatada);
-      setErros((errosAtuais) => ({ ...errosAtuais, dataTermino: false }));
+      setErros((anteriores) => ({ ...anteriores, dataTermino: false }));
     }
 
     setCalendarioVisivel(false);
+  };
+
+  // Opens Android's native dialog or the iOS wheel picker modal.
+  const abrirCalendario = (campo: CampoData) => {
+    setCampoDataAtivo(campo);
+
+    const valorInicial = obterDataInicial(campo);
+    const dataMinima = obterDataMinima(campo);
+
+    if (Platform.OS === 'android' && DateTimePickerAndroid) {
+      DateTimePickerAndroid.open({
+        value: valorInicial,
+        mode: 'date',
+        display: 'default',
+        minimumDate: dataMinima,
+        onChange: (evento: { type: string }, dataSelecionada?: Date) => {
+          if (evento.type === 'set' && dataSelecionada) {
+            selecionarData(dataSelecionada);
+          }
+        },
+      });
+
+      return;
+    }
+
+    if (Platform.OS === 'ios') {
+      setDataTemporaria(valorInicial);
+      setCalendarioVisivel(true);
+    }
+  };
+
+  // Web fallback: manually type DD/MM/AAAA, just like the participant form.
+  const alterarDataWeb = (campo: CampoData, texto: string) => {
+    const dataFormatada = formatarData(texto);
+
+    if (campo === 'inicio') {
+      setDataInicio(dataFormatada);
+      setErros((anteriores) => ({ ...anteriores, dataInicio: false }));
+    } else {
+      setDataTermino(dataFormatada);
+      setErros((anteriores) => ({ ...anteriores, dataTermino: false }));
+    }
   };
 
   // Validação e cadastro do evento
@@ -299,8 +334,8 @@ export default function Eventos() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={Platform.OS === 'android' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 90}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {/* Cabeçalho */}
@@ -350,21 +385,36 @@ export default function Eventos() {
                 Data de início <Text style={styles.requiredStar}>*</Text>
               </Text>
 
-              <TouchableOpacity
-                style={[styles.inputWithIcon, !!erros.dataInicio && styles.inputError]}
-                onPress={() => abrirCalendario('inicio')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Selecionar data de início"
-              >
-                <Text
-                  style={[styles.flexInput, !dataInicio && styles.datePlaceholder]}
-                  numberOfLines={1}
+              {Platform.OS === 'web' ? (
+                <View style={[styles.inputWithIcon, !!erros.dataInicio && styles.inputError]}>
+                  <TextInput
+                    style={styles.flexInput}
+                    placeholder="DD/MM/AAAA"
+                    placeholderTextColor="#999"
+                    keyboardType="numeric"
+                    maxLength={10}
+                    value={dataInicio}
+                    onChangeText={(text) => alterarDataWeb('inicio', text)}
+                  />
+                  <Ionicons name="calendar-outline" size={20} color="#8000FF" />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.inputWithIcon, !!erros.dataInicio && styles.inputError]}
+                  onPress={() => abrirCalendario('inicio')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Selecionar data de início"
                 >
-                  {dataInicio || 'DD/MM/AAAA'}
-                </Text>
-                <Ionicons name="calendar-outline" size={20} color="#8000FF" />
-              </TouchableOpacity>
+                  <Text
+                    style={[styles.flexInput, !dataInicio && styles.datePlaceholder]}
+                    numberOfLines={1}
+                  >
+                    {dataInicio || 'DD/MM/AAAA'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color="#8000FF" />
+                </TouchableOpacity>
+              )}
 
               {erros.dataInicio && <Text style={styles.errorText}>{String(erros.dataInicio)}</Text>}
             </View>
@@ -373,21 +423,36 @@ export default function Eventos() {
             <View style={styles.halfColumn}>
               <Text style={styles.label}>Data de término</Text>
 
-              <TouchableOpacity
-                style={[styles.inputWithIcon, !!erros.dataTermino && styles.inputError]}
-                onPress={() => abrirCalendario('termino')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Selecionar data de término"
-              >
-                <Text
-                  style={[styles.flexInput, !dataTermino && styles.datePlaceholder]}
-                  numberOfLines={1}
+              {Platform.OS === 'web' ? (
+                <View style={[styles.inputWithIcon, !!erros.dataTermino && styles.inputError]}>
+                  <TextInput
+                    style={styles.flexInput}
+                    placeholder="DD/MM/AAAA"
+                    placeholderTextColor="#999"
+                    keyboardType="numeric"
+                    maxLength={10}
+                    value={dataTermino}
+                    onChangeText={(text) => alterarDataWeb('termino', text)}
+                  />
+                  <Ionicons name="calendar-outline" size={20} color="#8000FF" />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.inputWithIcon, !!erros.dataTermino && styles.inputError]}
+                  onPress={() => abrirCalendario('termino')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Selecionar data de término"
                 >
-                  {dataTermino || 'DD/MM/AAAA'}
-                </Text>
-                <Ionicons name="calendar-outline" size={20} color="#8000FF" />
-              </TouchableOpacity>
+                  <Text
+                    style={[styles.flexInput, !dataTermino && styles.datePlaceholder]}
+                    numberOfLines={1}
+                  >
+                    {dataTermino || 'DD/MM/AAAA'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color="#8000FF" />
+                </TouchableOpacity>
+              )}
 
               {erros.dataTermino && <Text style={styles.errorText}>{String(erros.dataTermino)}</Text>}
             </View>
@@ -499,82 +564,80 @@ export default function Eventos() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modal do calendário */}
-      <Modal
-        visible={calendarioVisivel}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setCalendarioVisivel(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setCalendarioVisivel(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Fechar calendário"
-          />
-
-          <View style={styles.calendarSheet}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {campoDataAtivo === 'inicio' ? 'Data de início' : 'Data de término'}
-                </Text>
-                <Text style={styles.modalSubtitle}>Selecione o dia do evento</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setCalendarioVisivel(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Fechar"
-              >
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <Calendar
-              current={obterDataSelecionada()}
-              onDayPress={(day) => selecionarData(day.dateString)}
-              markedDates={{
-                [obterDataSelecionada()]: {
-                  selected: true,
-                  selectedColor: '#8000FF',
-                  selectedTextColor: '#FFFFFF',
-                },
-              }}
-              enableSwipeMonths
-              minDate={obterDataMinimaCalendario()}
-              showSixWeeks={true}
-              firstDay={0}
-              theme={{
-                backgroundColor: '#FFFFFF',
-                calendarBackground: '#FFFFFF',
-                selectedDayBackgroundColor: '#8000FF',
-                selectedDayTextColor: '#FFFFFF',
-                todayTextColor: '#8000FF',
-                arrowColor: '#8000FF',
-                monthTextColor: '#171717',
-                textMonthFontWeight: 'bold',
-                textDayFontSize: 15,
-                textMonthFontSize: 18,
-                textDayHeaderFontSize: 12,
-                textSectionTitleColor: '#777777',
-              }}
+      {/* iOS native date picker modal */}
+      {Platform.OS === 'ios' && (
+        <Modal
+          visible={calendarioVisivel}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setCalendarioVisivel(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalBackdrop}
+              activeOpacity={1}
+              onPress={() => setCalendarioVisivel(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Fechar seletor de data"
             />
 
-            <TouchableOpacity
-              style={styles.calendarCancelButton}
-              onPress={() => setCalendarioVisivel(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.calendarCancelText}>Cancelar</Text>
-            </TouchableOpacity>
+            <View style={styles.calendarSheet}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>
+                    {campoDataAtivo === 'inicio' ? 'Data de início' : 'Data de término'}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    Selecione a data do evento
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setCalendarioVisivel(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fechar"
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+
+              {DateTimePicker && (
+                <DateTimePicker
+                  value={dataTemporaria}
+                  mode="date"
+                  display="spinner"
+                  locale="pt-BR"
+                  minimumDate={obterDataMinima(campoDataAtivo)}
+                  themeVariant="light"
+                  textColor="#222222"
+                  onChange={(_evento: any, dataSelecionada?: Date) => {
+                    if (dataSelecionada) {
+                      setDataTemporaria(dataSelecionada);
+                    }
+                  }}
+                />
+              )}
+
+              <View style={styles.acoesCalendario}>
+                <TouchableOpacity
+                  style={styles.calendarCancelButton}
+                  onPress={() => setCalendarioVisivel(false)}
+                >
+                  <Text style={styles.calendarCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.calendarConfirmButton}
+                  onPress={() => selecionarData(dataTemporaria)}
+                >
+                  <Text style={styles.calendarConfirmText}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -710,7 +773,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Estilos do modal/calendário
+  // Estilos do modal do seletor nativo no iOS
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -729,14 +792,13 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 24,
-    // Espaço extra para que o botão não fique sob a navegação do Android.
-    paddingBottom: Platform.OS === 'ios' ? 34 : 60,
+    paddingBottom: 28,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 20,
@@ -756,8 +818,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  acoesCalendario: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
   calendarCancelButton: {
-    marginTop: 16,
+    flex: 1,
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
@@ -769,5 +836,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: '#8000FF',
+  },
+  calendarConfirmButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#8000FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarConfirmText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
 });

@@ -2,12 +2,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function DetalhesEvento() {
@@ -47,11 +47,11 @@ export default function DetalhesEvento() {
 
   function acessarTela(tela: string) {
     if (tela === "participantes") {
-      router.push("/(funcoes)/novoparticipante");
+      router.push("/participantescadastrados");
     } else if (tela === "filas") {
-      router.push("/(funcoes)/filas");
+      router.push("/filas");
     } else if (tela === "estatisticas") {
-      router.push("/(funcoes)/estatistica");
+      router.push("/estatistica");
     }
   }
 
