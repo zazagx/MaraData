@@ -26,6 +26,20 @@ export default function FuncoesLayout() {
       {/* OTHER FUNCTIONALITIES */}
 
       <Stack.Screen
+        name="eventos/detalhes"
+        options={{
+          title: "Detalhes do evento",
+        }}
+      />
+
+      <Stack.Screen
+        name="eventos/cadastro"
+        options={{
+          title: "Evento cadastrado",
+        }}
+      />
+
+      <Stack.Screen
         name="filas"
         options={{
           headerShown: false,
