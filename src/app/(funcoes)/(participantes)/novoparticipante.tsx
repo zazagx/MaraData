@@ -38,6 +38,7 @@ const OPCOES_GENERO = [
 ]
 
 const OPCOES_ESCOLARIDADE = [
+  'Não Alfabetizado',
   'Ensino Fundamental',
   'Ensino Médio',
   'Ensino Superior',

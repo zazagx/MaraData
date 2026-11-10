@@ -15,8 +15,15 @@ export default function CriarFila() {
 
   const nomeEvento = params.nomeEvento || '';
   const localEvento = params.localEvento || '';
-  const eventoAtivo = params.situacao === 'em_andamento' && nomeEvento !== '' && localEvento !== '';
+const situacaoEvento = String(params.situacao || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, '_');
 
+const eventoAtivo =
+  situacaoEvento === 'em_andamento' &&
+  nomeEvento.trim() !== '' &&
+  localEvento.trim() !== '';
   function cadastrarFila() {
     if (!eventoAtivo) return;
     if (nome.trim() === '') {

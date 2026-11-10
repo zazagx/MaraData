@@ -1,12 +1,51 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { BackHandler } from 'react-native';
+
+import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BarraJogo } from '../../components/BarraJogo';
 
 export default function EstatisticaScreen() {
   const [eventoSelecionado, setEventoSelecionado] = useState('Arena Games São Luís - MA');
+  useFocusEffect(
+  useCallback(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        router.dismissTo('/')
+        return true
+      }
+    )
+
+    return () => subscription.remove()
+  }, [])
+)
 
   return (
     <SafeAreaView style={styles.container}>
+      <Stack.Screen
+  options={{
+    headerShown: true,
+    title: 'Estatísticas',
+    headerStyle: {
+      backgroundColor: '#8000FF',
+    },
+    headerTintColor: '#FFFFFF',
+    headerTitleAlign: 'center',
+
+    headerLeft: () => (
+      <TouchableOpacity
+        onPress={() => router.dismissTo('/')}
+        style={{ marginLeft: 8 }}
+      >
+        <Ionicons name="arrow-back" size={25} color="#FFFFFF" />
+      </TouchableOpacity>
+    ),
+  }}
+/>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         

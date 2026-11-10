@@ -8,7 +8,9 @@ import { useCallback, useState } from 'react'
 
 import {
   FlatList,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -31,6 +33,10 @@ function calcularIdade(dataNascimento: string) {
   }
 
   return idade
+}
+function formatarData(dataNascimento: string) {
+  const [ano, mes, dia] = dataNascimento.split('-')
+  return `${dia}/${mes}/${ano}`
 }
 
 
@@ -66,6 +72,10 @@ export default function ParticipantesCadastrados() {
       .toLocaleLowerCase('pt-BR')
       .includes(busca.trim().toLocaleLowerCase('pt-BR'))
   )
+
+  //Setinha de detalhes do respectivo participante ああああ
+  const [participanteSelecionado, setParticipanteSelecionado] =
+  useState<Participante | null>(null)
 
 
   return (
@@ -140,6 +150,7 @@ export default function ParticipantesCadastrados() {
         renderItem={({ item }) => {
 
           const idade = calcularIdade(item.dataNascimento)
+          
 
           return (
             <View style={styles.card}>
@@ -166,40 +177,115 @@ export default function ParticipantesCadastrados() {
 
                 </View>
 
-                <Text style={styles.seta}>›</Text>
+                <Pressable
+                style={styles.botaoSeta}
+                onPress={() => setParticipanteSelecionado(item)}
+                hitSlop={10}
+                >
+                  <Text style={styles.seta}>›</Text>
+                </Pressable>
 
               </View>
 
 
               {/* ADDITIONAL INFORMATION */}
 
-              <View style={styles.detalhes}>
-
-                <Text style={styles.informacao}>
-                  <Text style={styles.simbolo}>◆ </Text>
-                  Escolaridade: {item.escolaridade}
-                </Text>
-
-                <Text style={styles.informacao}>
-                  🎮 Jogos: {item.jogos.join(', ')}
-                </Text>
-
-                <Text style={styles.informacao}>
-                  <Text style={styles.simbolo}>◆ </Text>
-                  Mercado de games: {item.mercadoGames}
-                </Text>
-
-                <Text style={styles.informacao}>
-                  <Text style={styles.simbolo}>★ </Text>
-                  Interesse profissional: {item.interesseProfissionalGames}
-                </Text>
-
-              </View>
-
             </View>
           )
         }}
       />
+      <Modal
+  visible={participanteSelecionado !== null}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setParticipanteSelecionado(null)}
+>
+  <View style={styles.fundoModal}>
+
+    {/* Fundo escuro clicável */}
+    <Pressable
+      style={StyleSheet.absoluteFill}
+      onPress={() => setParticipanteSelecionado(null)}
+    />
+
+    {/* Card de informações */}
+    <View style={styles.modalCard}>
+
+      {participanteSelecionado && (
+        <ScrollView showsVerticalScrollIndicator={false}>
+
+          <View style={styles.modalCabecalho}>
+
+            <View style={styles.avatar}>
+              <Text style={styles.iniciais}>
+                {obterIniciais(participanteSelecionado.nome)}
+              </Text>
+            </View>
+
+            <View style={styles.identificacaoModal}>
+              <Text style={styles.nomeModal}>
+                {participanteSelecionado.nome}
+              </Text>
+
+              <Text style={styles.subtitulo}>
+                {calcularIdade(participanteSelecionado.dataNascimento)} anos
+                {' • '}
+                {participanteSelecionado.genero}
+              </Text>
+            </View>
+
+            <Pressable
+              style={styles.botaoFechar}
+              onPress={() => setParticipanteSelecionado(null)}
+            >
+              <Text style={styles.textoFechar}>×</Text>
+            </Pressable>
+
+          </View>
+
+          <View style={styles.separador} />
+
+          <Text style={styles.rotuloModal}>
+            Data de nascimento
+          </Text>
+          <Text style={styles.valorModal}>
+            {formatarData(participanteSelecionado.dataNascimento)}
+          </Text>
+
+          <Text style={styles.rotuloModal}>
+            Escolaridade
+          </Text>
+          <Text style={styles.valorModal}>
+            {participanteSelecionado.escolaridade}
+          </Text>
+
+          <Text style={styles.rotuloModal}>
+            Jogos de interesse
+          </Text>
+          <Text style={styles.valorModal}>
+            {participanteSelecionado.jogos.join(', ')}
+          </Text>
+
+          <Text style={styles.rotuloModal}>
+            Conhece o mercado de games?
+          </Text>
+          <Text style={styles.valorModal}>
+            {participanteSelecionado.mercadoGames}
+          </Text>
+
+          <Text style={styles.rotuloModal}>
+            Interesse profissional no mercado de games
+          </Text>
+          <Text style={styles.valorModal}>
+            {participanteSelecionado.interesseProfissionalGames}
+          </Text>
+
+        </ScrollView>
+      )}
+
+    </View>
+  </View>
+</Modal>
 
     </View>
   )
@@ -345,5 +431,78 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+  botaoSeta: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+},
+
+fundoModal: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.60)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+},
+
+modalCard: {
+  backgroundColor: '#fff',
+  width: '100%',
+  maxWidth: 480,
+  maxHeight: '80%',
+  borderRadius: 18,
+  padding: 20,
+  elevation: 10,
+},
+
+modalCabecalho: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 15,
+},
+
+identificacaoModal: {
+  flex: 1,
+},
+
+nomeModal: {
+  fontSize: 17,
+  fontWeight: 'bold',
+  color: '#17152b',
+},
+
+botaoFechar: {
+  width: 32,
+  height: 32,
+  borderRadius: 20,
+  backgroundColor: '#eee',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+textoFechar: {
+  fontSize: 25,
+  color: '#555',
+  lineHeight: 28,
+},
+
+separador: {
+  height: 1,
+  backgroundColor: '#ddd',
+  marginBottom: 15,
+},
+
+rotuloModal: {
+  fontSize: 13,
+  fontWeight: 'bold',
+  color: '#8000ff',
+  marginTop: 12,
+  marginBottom: 4,
+},
+
+valorModal: {
+  fontSize: 14,
+  color: '#333',
+  lineHeight: 21,
+},
 
 })

@@ -12,8 +12,16 @@ export default function ListaFilas() {
   }>();
   const [filas, setFilas] = useState<Fila[]>([]);
 
-  const eventoDisponivel = Boolean(params.nomeEvento && params.localEvento && params.situacao === 'em_andamento');
-  const filasExibidas = params.nomeEvento
+const situacaoEvento = String(params.situacao || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, '_');
+
+const eventoDisponivel = Boolean(
+  params.nomeEvento?.trim() &&
+  params.localEvento?.trim() &&
+  situacaoEvento === 'em_andamento'
+);  const filasExibidas = params.nomeEvento
     ? filas.filter((fila) => fila.evento === params.nomeEvento)
     : filas;
 
@@ -21,16 +29,16 @@ export default function ListaFilas() {
     setFilas(buscarFilas());
   }, []));
 
-  function abrirCriacao() {
-    router.push({
-      pathname: '/filas/criarfilas',
-      params: {
-        nomeEvento: params.nomeEvento || '',
-        localEvento: params.localEvento || '',
-        situacao: params.situacao || '',
-      },
-    });
-  }
+function abrirCriacao() {
+  router.push({
+    pathname: '/filas/criarfilas',
+    params: {
+      nomeEvento: params.nomeEvento || '',
+      localEvento: params.localEvento || '',
+      situacao: situacaoEvento,
+    },
+  });
+}
 
   return (
     <View style={styles.container}>

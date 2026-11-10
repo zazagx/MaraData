@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+<<<<<<< HEAD
 import { router } from 'expo-router';
 import type { ComponentRef } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+=======
+import { Stack, router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+>>>>>>> 523415b (CorreçãoBugs-roteamento e Bugs gerais)
 import {
-  Alert,
-  KeyboardAvoidingView,
+  BackHandler, KeyboardAvoidingView,
   Modal,
   Platform,
   SafeAreaView,
@@ -14,8 +18,17 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+<<<<<<< HEAD
+=======
+import { salvarEventoAtivo } from '../../features/armazenamentoEvento';
+// Use the same native date picker used in the participant form.
+// On web, dates are entered manually as DD/MM/AAAA.
+const DatePickerModule: any = Platform.OS === 'web'
+  ? null
+  : require('@react-native-community/datetimepicker');
+>>>>>>> 523415b (CorreçãoBugs-roteamento e Bugs gerais)
 
 type CampoDataOuHora = 'dataInicio' | 'dataTermino' | 'horarioInicio' | 'horarioTermino';
 type WheelColumnProps = {
@@ -232,6 +245,7 @@ export default function Eventos() {
       }
     }
 
+<<<<<<< HEAD
     setErros(novosErros);
     if (Object.keys(novosErros).length > 0) {
       Alert.alert('Dados incompletos ou incorretos', 'Por favor, corrija os campos indicados.');
@@ -252,10 +266,82 @@ export default function Eventos() {
   };
 
   const irParaHome = () => router.replace('/');
+=======
+setErros(novosErros);
+
+// Se houver erros, permanece no formulário.
+if (Object.keys(novosErros).length > 0) {
+  return;
+}
+>>>>>>> 523415b (CorreçãoBugs-roteamento e Bugs gerais)
+
+// Substitui o formulário pela tela de detalhes.
+// Assim, o botão voltar retorna diretamente para a Home.
+// Organiza os dados do evento.
+const novoEvento = {
+  nomeEvento: nomeEvento.trim(),
+  localEvento: localEvento.trim(),
+  dataInicio,
+  dataTermino,
+  horarioInicio,
+  horarioTermino,
+  descricao,
+  situacao,
+};
+
+// Salva o evento para que outras telas possam acessá-lo.
+salvarEventoAtivo(novoEvento);
+
+// Abre os detalhes do evento.
+router.replace({
+  pathname: "/(funcoes)/eventos/detalhes",
+  params: novoEvento,
+});
+};
+useFocusEffect(
+  useCallback(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        router.dismissTo('/')
+        return true
+      }
+    )
+
+    return () => subscription.remove()
+  }, [])
+)
 
   return (
     <SafeAreaView style={styles.container}>
+<<<<<<< HEAD
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+=======
+      <Stack.Screen
+  options={{
+    headerShown: true,
+    title: 'Cadastrar evento',
+    headerStyle: {
+      backgroundColor: '#8000FF',
+    },
+    headerTintColor: '#FFFFFF',
+    headerTitleAlign: 'center',
+
+    headerLeft: () => (
+      <TouchableOpacity
+  style={styles.cancelButton}
+onPress={() => router.dismissTo('/')}>
+        <Ionicons name="arrow-back" size={25} color="#FFFFFF" />
+      </TouchableOpacity>
+    ),
+  }}
+/>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 90}
+      >
+>>>>>>> 523415b (CorreçãoBugs-roteamento e Bugs gerais)
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           
           {/* Cabeçalho da tela */}

@@ -1,14 +1,13 @@
-
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback } from 'react';
 import {
-  Alert,
-  ScrollView,
+  Alert, BackHandler, ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-} from "react-native";
+  View
+} from 'react-native';
 
 export default function DetalhesEvento() {
   const params = useLocalSearchParams<{
@@ -29,8 +28,10 @@ export default function DetalhesEvento() {
   const horarioInicio = params.horarioInicio || "Não informado";
   const horarioTermino = params.horarioTermino || "Não informado";
   const descricao = params.descricao || "Nenhuma descrição cadastrada.";
-  const situacao = params.situacao || "agendado";
-
+const situacao = String(params.situacao || "agendado")
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, "_");
   const situacaoFormatada =
     situacao === "em_andamento"
       ? "Em andamento"
@@ -61,8 +62,43 @@ export default function DetalhesEvento() {
     router.push("/estatistica");
   }
 }
+useFocusEffect(
+  useCallback(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        router.dismissTo('/')
+        return true
+      }
+    )
+
+    return () => subscription.remove()
+  }, [])
+)
 
   return (
+     <>
+      <Stack.Screen
+      options={{
+        headerShown: true,
+        title: 'Detalhes do evento',
+        headerStyle: {
+          backgroundColor: '#8000FF',
+        },
+        headerTintColor: '#FFFFFF',
+        headerTitleAlign: 'center',
+
+        headerLeft: () => (
+          <TouchableOpacity
+            onPress={() => router.dismissTo('/')}
+            style={{ marginLeft: 8 }}
+          >
+            <Ionicons name="arrow-back" size={25} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+      }}
+    />
+
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.conteudo}
@@ -229,7 +265,8 @@ export default function DetalhesEvento() {
         <Ionicons name="game-controller-outline" size={23} color="#8000FF" />
         <Text style={styles.textoRodape}>MaraData • Beast MaraGames</Text>
       </View>
-    </ScrollView>
+        </ScrollView>
+  </>
   );
 }
 
