@@ -1,53 +1,42 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  buscarEventoAtivo,
-  type EventoAtivo,
-} from '../features/armazenamentoEvento';
+import { useEvento } from '../context/eventocontexto';
 
 export default function Home() {
-  const [eventoAtivo, setEventoAtivo] = useState<EventoAtivo | null>(null);
+  const { evento: eventoAtivo } = useEvento();
 
-  // Atualiza as informações sempre que a Home recebe foco.
-  useFocusEffect(
-    useCallback(() => {
-      setEventoAtivo(buscarEventoAtivo());
-    }, [])
-  );
-
-  // Abre os detalhes do evento.
+  // Abre os detalhes do evento se existir, ou vai para o cadastro se estiver vazio.
   function abrirDetalhes() {
-    if (!eventoAtivo) {
-      router.push('/eventos');
-      return;
-    }
-
-  router.push({
-  pathname: '/(funcoes)/eventos/detalhes',
-  params: {
-    nomeEvento: eventoAtivo.nomeEvento,
-    localEvento: eventoAtivo.localEvento,
-    dataInicio: eventoAtivo.dataInicio,
-    dataTermino: eventoAtivo.dataTermino,
-    horarioInicio: eventoAtivo.horarioInicio,
-    horarioTermino: eventoAtivo.horarioTermino,
-    descricao: eventoAtivo.descricao,
-    situacao: eventoAtivo.situacao,
-  },
-});
-  }
-
-  // Abre as filas enviando os dados do evento.
-  function abrirFilas() {
-    if (!eventoAtivo) {
-      router.push('/filas');
+    if (!eventoAtivo || !eventoAtivo.nomeEvento) {
+      router.push('/(funcoes)/eventos');
       return;
     }
 
     router.push({
-      pathname: '/filas',
+      pathname: '/(funcoes)/eventos/detalhes',
+      params: {
+        nomeEvento: eventoAtivo.nomeEvento,
+        localEvento: eventoAtivo.localEvento,
+        dataInicio: eventoAtivo.dataInicio,
+        dataTermino: eventoAtivo.dataTermino,
+        horarioInicio: eventoAtivo.horarioInicio,
+        horarioTermino: eventoAtivo.horarioTermino,
+        descricao: eventoAtivo.descricao,
+        situacao: eventoAtivo.situacao,
+      },
+    });
+  }
+
+  // Abre as filas enviando os dados do evento.
+  function abrirFilas() {
+    if (!eventoAtivo || !eventoAtivo.nomeEvento) {
+      router.push('/(funcoes)/filas');
+      return;
+    }
+
+    router.push({
+      pathname: '/(funcoes)/filas',
       params: {
         nomeEvento: eventoAtivo.nomeEvento,
         localEvento: eventoAtivo.localEvento,
@@ -72,7 +61,7 @@ export default function Home() {
         </Text>
 
         <Text style={styles.eventoCardText}>
-          {eventoAtivo
+          {eventoAtivo && eventoAtivo.nomeEvento
             ? eventoAtivo.situacao === 'em_andamento'
               ? '● Evento em andamento'
               : '● Evento agendado'
@@ -85,7 +74,7 @@ export default function Home() {
         <View style={styles.buttonCard}>
 
           <Pressable
-            onPress={() => router.push('/participantescadastrados')}
+            onPress={() => router.push('/(funcoes)/(participantes)/participantescadastrados')}
             style={button.button}
           >
             <Text style={button.buttonText}>
@@ -103,7 +92,7 @@ export default function Home() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push('/estatistica')}
+            onPress={() => router.push('/(funcoes)/estatistica')}
             style={button.button}
           >
             <Text style={button.buttonText}>
@@ -112,7 +101,7 @@ export default function Home() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push('/eventos')}
+            onPress={() => router.push('/(funcoes)/eventos')}
             style={button.button}
           >
             <Text style={button.buttonText}>

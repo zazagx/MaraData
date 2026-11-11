@@ -1,15 +1,20 @@
-import { Ionicons } from "@expo/vector-icons";
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import {
-  Alert, BackHandler, ScrollView,
+  Alert,
+  Modal,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+import { useEvento } from '../../../context/eventocontexto';
 
 export default function DetalhesEvento() {
+  const { evento: eventoContexto, setEvento } = useEvento();
   const params = useLocalSearchParams<{
     nomeEvento?: string;
     localEvento?: string;
@@ -18,493 +23,388 @@ export default function DetalhesEvento() {
     horarioInicio?: string;
     horarioTermino?: string;
     descricao?: string;
-    situacao?: string;
+    situacao?: 'agendado' | 'em_andamento' | 'encerrado';
   }>();
 
-  const nomeEvento = params.nomeEvento || "Nome do evento";
-  const localEvento = params.localEvento || "Local não informado";
-  const dataInicio = params.dataInicio || "Não informada";
-  const dataTermino = params.dataTermino || "Não informada";
-  const horarioInicio = params.horarioInicio || "Não informado";
-  const horarioTermino = params.horarioTermino || "Não informado";
-  const descricao = params.descricao || "Nenhuma descrição cadastrada.";
-const situacao = String(params.situacao || "agendado")
-  .trim()
-  .toLowerCase()
-  .replace(/\s+/g, "_");
+  // Dá prioridade absoluta ao contexto global atualizado, depois aos parâmetros e por fim aos padrões[cite: 6]
+  const nomeEvento = eventoContexto?.nomeEvento || params.nomeEvento || 'Evento';
+  const localEvento = eventoContexto?.localEvento || params.localEvento || 'Local não informado';
+  const dataInicio = eventoContexto?.dataInicio || params.dataInicio || 'Não informada';
+  const dataTermino = eventoContexto?.dataTermino || params.dataTermino || '';
+  const horarioInicio = eventoContexto?.horarioInicio || params.horarioInicio || 'Não informado';
+  const horarioTermino = eventoContexto?.horarioTermino || params.horarioTermino || '';
+  const descricao = eventoContexto?.descricao || params.descricao || '';
+  const situacao = (eventoContexto?.situacao || params.situacao || 'agendado') as 'agendado' | 'em_andamento' | 'encerrado';
+
+  // Estados dos modais de suporte[cite: 6]
+  const [modalMenuVisivel, setModalMenuVisivel] = useState(false);
+  const [modalEncerrarVisivel, setModalEncerrarVisivel] = useState(false);
+
   const situacaoFormatada =
-    situacao === "em_andamento"
-      ? "Em andamento"
-      : situacao === "encerrado"
-      ? "Encerrado"
-      : "Agendado";
+    situacao === 'em_andamento'
+      ? 'EM ANDAMENTO'
+      : situacao === 'encerrado'
+      ? 'ENCERRADO'
+      : 'AGENDADO';
 
-  function mostrarAviso(funcionalidade: string) {
-    Alert.alert(
-      funcionalidade,
-      "Esta funcionalidade será implementada na próxima etapa."
-    );
-  }
+  const handleEncerrarEvento = () => {
+    setModalEncerrarVisivel(false);
+    if (eventoContexto) {
+      // Limpa os dados do evento ou define como nulo no contexto global[cite: 6]
+      setEvento({
+        nomeEvento: '',
+        localEvento: '',
+        dataInicio: '',
+        dataTermino: '',
+        horarioInicio: '',
+        horarioTermino: '',
+        descricao: '',
+        situacao: 'encerrado',
+      });
+    }
+    Alert.alert('Evento Encerrado', 'O evento foi finalizado com sucesso.', [
+      {
+        text: 'OK',
+        onPress: () => router.replace('/'), // Volta para a Home já limpa[cite: 6]
+      },
+    ]);
+  };
 
-  function acessarTela(tela: string) {
-  if (tela === "participantes") {
-    router.push("/participantescadastrados");
-  } else if (tela === "filas") {
+  // Função para abrir a tela de cadastro enviando os dados atuais para edição[cite: 6]
+  const irParaEdicao = () => {
     router.push({
-      pathname: "/filas",
+      pathname: '/(funcoes)/eventos',
       params: {
+        editando: 'true',
         nomeEvento,
         localEvento,
+        dataInicio,
+        dataTermino,
+        horarioInicio,
+        horarioTermino,
+        descricao,
         situacao,
       },
     });
-  } else if (tela === "estatisticas") {
-    router.push("/estatistica");
-  }
-}
-useFocusEffect(
-  useCallback(() => {
-    const subscription = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        router.dismissTo('/')
-        return true
-      }
-    )
+  };
 
-    return () => subscription.remove()
-  }, [])
-)
+  const acessarNavegacao = (tela: string) => {
+    if (tela === 'participantes') {
+      router.push('/(funcoes)/(participantes)/participantescadastrados');
+    } else if (tela === 'filas') {
+      router.push({
+        pathname: '/(funcoes)/filas',
+        params: { nomeEvento, localEvento, situacao },
+      });
+    } else if (tela === 'estatisticas') {
+      router.push('/(funcoes)/estatistica');
+    }
+  };
 
   return (
-     <>
+    <SafeAreaView style={styles.container}>
+      {/* Botão de voltar customizado para retornar direto à Home[cite: 6] */}
       <Stack.Screen
-      options={{
-        headerShown: true,
-        title: 'Detalhes do evento',
-        headerStyle: {
-          backgroundColor: '#8000FF',
-        },
-        headerTintColor: '#FFFFFF',
-        headerTitleAlign: 'center',
+        options={{
+          headerShown: true,
+          title: 'Detalhes do evento',
+          headerLeft: () => (
+            <TouchableOpacity 
+              onPress={() => router.replace('/')} 
+              style={{ marginLeft: 4, marginRight: 12 }}
+              accessibilityLabel="Voltar para Home"
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
 
-        headerLeft: () => (
-          <TouchableOpacity
-            onPress={() => router.dismissTo('/')}
-            style={{ marginLeft: 8 }}
-          >
-            <Ionicons name="arrow-back" size={25} color="#FFFFFF" />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        
+        {/* Banner Superior Roxo Escuro[cite: 6] */}
+        <View style={styles.topBanner}>
+          <View style={styles.bannerHeader}>
+            <View />
+            <TouchableOpacity style={styles.menuIconButton} onPress={() => setModalMenuVisivel(true)}>
+              <Ionicons name="ellipsis-vertical" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.badgeContainer}>
+            <View style={[styles.badge, situacao === 'em_andamento' && styles.badgeAndamento, situacao === 'encerrado' && styles.badgeEncerrado]}>
+              <Text style={styles.badgeText}>{situacaoFormatada}</Text>
+            </View>
+          </View>
+
+          <View style={styles.bannerBody}>
+            <View style={styles.bannerTextGroup}>
+              <Text style={styles.bannerEventName}>{nomeEvento}</Text>
+              <Text style={styles.bannerEventSub}>Gerenciamento e operação do evento</Text>
+            </View>
+            <View style={styles.gameIllustration}>
+              <Ionicons name="game-controller-outline" size={54} color="rgba(255, 255, 255, 0.4)" />
+            </View>
+          </View>
+        </View>
+
+        {/* Card Principal de Informações[cite: 6] */}
+        <View style={styles.mainCard}>
+          <Text style={styles.cardSectionTitle}>Informações do evento</Text>
+
+          {/* Local inserido pelo usuário[cite: 6] */}
+          <View style={styles.infoRowBlock}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="location" size={20} color="#7C3AED" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Local</Text>
+              <Text style={styles.infoValueBold}>{localEvento}</Text>
+            </View>
+          </View>
+
+          {/* Datas[cite: 6] */}
+          <View style={styles.gridRow}>
+            <View style={styles.gridCol}>
+              <View style={styles.infoIconBoxSmall}>
+                <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+              </View>
+              <Text style={styles.infoLabel}>Data de início</Text>
+              <Text style={styles.infoValueBold}>{dataInicio}</Text>
+            </View>
+
+            {dataTermino ? (
+              <View style={styles.gridCol}>
+                <View style={styles.infoIconBoxSmall}>
+                  <Ionicons name="calendar" size={18} color="#7C3AED" />
+                </View>
+                <Text style={styles.infoLabel}>Data de término</Text>
+                <Text style={styles.infoValueBold}>{dataTermino}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Horários[cite: 6] */}
+          <View style={styles.gridRow}>
+            <View style={styles.gridCol}>
+              <View style={styles.infoIconBoxSmall}>
+                <Ionicons name="time-outline" size={18} color="#7C3AED" />
+              </View>
+              <Text style={styles.infoLabel}>Horário de início</Text>
+              <Text style={styles.infoValueBold}>{horarioInicio}</Text>
+            </View>
+
+            {horarioTermino ? (
+              <View style={styles.gridCol}>
+                <View style={styles.infoIconBoxSmall}>
+                  <Ionicons name="time" size={18} color="#7C3AED" />
+                </View>
+                <Text style={styles.infoLabel}>Horário de término</Text>
+                <Text style={styles.infoValueBold}>{horarioTermino}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Descrição[cite: 6] */}
+          {descricao ? (
+            <View style={styles.infoRowBlock}>
+              <View style={styles.infoIconBox}>
+                <Ionicons name="document-text-outline" size={20} color="#7C3AED" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Descrição</Text>
+                <Text style={styles.infoDescriptionText}>{descricao}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {/* Situação[cite: 6] */}
+          <TouchableOpacity style={styles.situationRow} onPress={() => setModalMenuVisivel(true)}>
+            <View style={styles.infoIconBoxSmall}>
+              <Ionicons name="calendar" size={18} color="#7C3AED" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoLabel}>Situação do evento</Text>
+              <Text style={styles.infoValueBold}>{situacaoFormatada.toLowerCase().replace('_', ' ')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </TouchableOpacity>
-        ),
-      }}
-    />
 
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.conteudo}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Identificação do evento */}
-      <View style={styles.banner}>
-        <View style={styles.bannerIcone}>
-          <Ionicons name="game-controller" size={48} color="#FFFFFF" />
-        </View>
+          {/* Ações Administrativas[cite: 6] */}
+          <Text style={[styles.cardSectionTitle, { marginTop: 24 }]}>Ações administrativas</Text>
+          
+          <View style={styles.adminButtonsRow}>
+            <TouchableOpacity style={styles.btnEditar} onPress={irParaEdicao}>
+              <Ionicons name="pencil-outline" size={16} color="#6D28D9" />
+              <Text style={styles.btnEditarText}>Editar evento</Text>
+            </TouchableOpacity>
 
-        <View style={styles.selo}>
-          <Ionicons name="checkmark-circle" size={15} color="#FFFFFF" />
-          <Text style={styles.seloTexto}>EVENTO CADASTRADO</Text>
-        </View>
-
-        <Text style={styles.nomeEvento}>{nomeEvento}</Text>
-
-        <View style={styles.localBanner}>
-          <Ionicons name="location-outline" size={17} color="#FFFFFF" />
-          <Text style={styles.localBannerTexto}>{localEvento}</Text>
-        </View>
-
-        <View style={styles.statusBanner}>
-          <View style={styles.statusPonto} />
-          <Text style={styles.statusBannerTexto}>{situacaoFormatada}</Text>
-        </View>
-      </View>
-
-      {/* Informações */}
-      <Text style={styles.tituloSecao}>Informações do evento</Text>
-
-      <View style={styles.card}>
-        <View style={styles.informacao}>
-          <View style={styles.iconeInformacao}>
-            <Ionicons name="location" size={22} color="#8000FF" />
+            <TouchableOpacity style={styles.btnEncerrar} onPress={() => setModalEncerrarVisivel(true)}>
+              <Ionicons name="power-outline" size={16} color="#DC2626" />
+              <Text style={styles.btnEncerrarText}>Encerrar evento</Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.informacaoTexto}>
-            <Text style={styles.rotulo}>Local</Text>
-            <Text style={styles.valor}>{localEvento}</Text>
+          <View style={styles.warningNote}>
+            <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+            <Text style={styles.warningNoteText}>
+              {situacao === 'agendado' 
+                ? 'O evento só pode ser encerrado quando estiver em andamento.' 
+                : 'Gerencie as sessões com atenção ao encerrar.'}
+            </Text>
           </View>
+
+          {/* Acesso Rápido[cite: 6] */}
+          <Text style={[styles.cardSectionTitle, { marginTop: 24 }]}>Acesso rápido</Text>
+          
+          <View style={styles.quickAccessGrid}>
+            <TouchableOpacity style={styles.quickAccessCard} onPress={() => acessarNavegacao('participantes')}>
+              <View style={styles.quickIconBox}>
+                <Ionicons name="people-outline" size={22} color="#7C3AED" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickCardTitle}>Participantes</Text>
+                <Text style={styles.quickCardSub}>Ver e gerenciar participantes</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickAccessCard} onPress={() => acessarNavegacao('filas')}>
+              <View style={styles.quickIconBox}>
+                <Ionicons name="list-outline" size={22} color="#7C3AED" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickCardTitle}>Filas</Text>
+                <Text style={styles.quickCardSub}>Gerenciar filas e acesso</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickAccessCard} onPress={() => acessarNavegacao('estatisticas')}>
+              <View style={styles.quickIconBox}>
+                <Ionicons name="stats-chart-outline" size={22} color="#7C3AED" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickCardTitle}>Estatísticas</Text>
+                <Text style={styles.quickCardSub}>Acompanhar indicadores</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
+            </TouchableOpacity>
+          </View>
+
         </View>
+      </ScrollView>
 
-        <View style={styles.divisor} />
+      {/* Bottom Sheet Modal: Menu de Opções[cite: 6] */}
+      <Modal visible={modalMenuVisivel} transparent animationType="slide" onRequestClose={() => setModalMenuVisivel(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalMenuVisivel(false)}>
+          <View style={styles.bottomSheetCard}>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); irParaEdicao(); }}>
+              <Ionicons name="pencil-outline" size={20} color="#6D28D9" />
+              <Text style={styles.sheetOptionText}>Editar evento</Text>
+            </TouchableOpacity>
 
-        <View style={styles.linhaDupla}>
-          <View style={styles.informacaoMetade}>
-            <View style={styles.iconeInformacao}>
-              <Ionicons name="calendar" size={21} color="#8000FF" />
-            </View>
-            <Text style={styles.rotulo}>Data de início</Text>
-            <Text style={styles.valor}>{dataInicio}</Text>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); setModalEncerrarVisivel(true); }}>
+              <Ionicons name="power-outline" size={20} color="#DC2626" />
+              <Text style={[styles.sheetOptionText, { color: '#DC2626' }]}>Encerrar evento</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.sheetOption, { borderBottomWidth: 0 }]} onPress={() => setModalMenuVisivel(false)}>
+              <Ionicons name="close-outline" size={20} color="#EF4444" />
+              <Text style={[styles.sheetOptionText, { color: '#EF4444' }]}>Cancelar</Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.informacaoMetade}>
-            <View style={styles.iconeInformacao}>
-              <Ionicons name="calendar-outline" size={21} color="#8000FF" />
-            </View>
-            <Text style={styles.rotulo}>Data de término</Text>
-            <Text style={styles.valor}>{dataTermino}</Text>
-          </View>
-        </View>
-
-        <View style={styles.divisor} />
-
-        <View style={styles.linhaDupla}>
-          <View style={styles.informacaoMetade}>
-            <View style={styles.iconeInformacao}>
-              <Ionicons name="time" size={21} color="#8000FF" />
-            </View>
-            <Text style={styles.rotulo}>Horário de início</Text>
-            <Text style={styles.valor}>{horarioInicio}</Text>
-          </View>
-
-          <View style={styles.informacaoMetade}>
-            <View style={styles.iconeInformacao}>
-              <Ionicons name="time-outline" size={21} color="#8000FF" />
-            </View>
-            <Text style={styles.rotulo}>Horário de término</Text>
-            <Text style={styles.valor}>{horarioTermino}</Text>
-          </View>
-        </View>
-
-        <View style={styles.divisor} />
-
-        <View style={styles.informacao}>
-          <View style={styles.iconeInformacao}>
-            <Ionicons name="document-text" size={22} color="#8000FF" />
-          </View>
-
-          <View style={styles.informacaoTexto}>
-            <Text style={styles.rotulo}>Descrição</Text>
-            <Text style={styles.valor}>{descricao}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Gerenciamento */}
-      <Text style={styles.tituloSecao}>Gerenciamento deste evento</Text>
-
-      <Text style={styles.subtitulo}>
-        Acesse as funcionalidades para administrar o evento cadastrado.
-      </Text>
-
-      <View style={styles.grade}>
-        <TouchableOpacity
-          style={styles.botaoFuncao}
-          onPress={() => acessarTela("participantes")}
-        >
-          <Ionicons name="people" size={30} color="#8000FF" />
-          <Text style={styles.nomeFuncao}>Participantes</Text>
-          <Text style={styles.descricaoFuncao}>Gerenciar cadastros</Text>
         </TouchableOpacity>
+      </Modal>
 
-        <TouchableOpacity
-          style={styles.botaoFuncao}
-          onPress={() => acessarTela("filas")}
-        >
-          <Ionicons name="list" size={30} color="#8000FF" />
-          <Text style={styles.nomeFuncao}>Filas</Text>
-          <Text style={styles.descricaoFuncao}>Gerenciar acessos</Text>
-        </TouchableOpacity>
+      {/* Modal de Confirmação de Encerramento[cite: 6] */}
+      <Modal visible={modalEncerrarVisivel} transparent animationType="fade" onRequestClose={() => setModalEncerrarVisivel(false)}>
+        <View style={styles.modalOverlayCenter}>
+          <View style={styles.alertCard}>
+            <View style={styles.powerIconBadge}>
+              <Ionicons name="power" size={26} color="#FFFFFF" />
+            </View>
 
-        <TouchableOpacity
-          style={styles.botaoFuncao}
-          onPress={() => acessarTela("estatisticas")}
-        >
-          <Ionicons name="bar-chart" size={30} color="#8000FF" />
-          <Text style={styles.nomeFuncao}>Estatísticas</Text>
-          <Text style={styles.descricaoFuncao}>Acompanhar indicadores</Text>
-        </TouchableOpacity>
+            <Text style={styles.alertTitle}>Encerrar evento?</Text>
+            <Text style={styles.alertSub}>Essa ação encerrará o evento atual e não poderá ser desfeita.</Text>
 
-        <TouchableOpacity
-          style={styles.botaoFuncao}
-          onPress={() => mostrarAviso("Histórico de eventos")}
-        >
-          <Ionicons name="calendar" size={30} color="#8000FF" />
-          <Text style={styles.nomeFuncao}>Eventos</Text>
-          <Text style={styles.descricaoFuncao}>Consultar histórico</Text>
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity style={styles.btnConfirmDanger} onPress={handleEncerrarEvento}>
+              <Text style={styles.btnConfirmDangerText}>Sim, encerrar</Text>
+            </TouchableOpacity>
 
-      {/* Ações administrativas */}
-      <Text style={styles.tituloSecao}>Ações administrativas</Text>
-
-      <TouchableOpacity
-        style={styles.botaoEditar}
-        onPress={() => mostrarAviso("Editar evento")}
-      >
-        <Ionicons name="create-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.textoBotao}>Editar evento</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.botaoEncerrar}
-        onPress={() => mostrarAviso("Encerrar evento")}
-      >
-        <Ionicons name="power-outline" size={22} color="#D92D45" />
-        <Text style={styles.textoBotaoEncerrar}>Encerrar evento</Text>
-      </TouchableOpacity>
-
-      <View style={styles.rodape}>
-        <Ionicons name="game-controller-outline" size={23} color="#8000FF" />
-        <Text style={styles.textoRodape}>MaraData • Beast MaraGames</Text>
-      </View>
-        </ScrollView>
-  </>
+            <TouchableOpacity style={styles.btnCancelDialog} onPress={() => setModalEncerrarVisivel(false)}>
+              <Text style={styles.btnCancelDialogText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F2",
-  },
+  container: { flex: 1, backgroundColor: '#1E1035' },
+  content: { flexGrow: 1, backgroundColor: '#1E1035' },
 
-  conteudo: {
-    padding: 20,
-    paddingBottom: 35,
-  },
+  topBanner: { backgroundColor: '#1E1035', paddingTop: 14, paddingHorizontal: 18, paddingBottom: 28 },
+  bannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  menuIconButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255, 255, 255, 0.12)', alignItems: 'center', justifyContent: 'center' },
+  
+  badgeContainer: { marginBottom: 12 },
+  badge: { backgroundColor: '#6D28D9', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
+  badgeAndamento: { backgroundColor: '#059669' },
+  badgeEncerrado: { backgroundColor: '#DC2626' },
+  badgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
-  banner: {
-    backgroundColor: "#8000FF",
-    borderRadius: 22,
-    padding: 22,
-    marginBottom: 28,
-  },
+  bannerBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  bannerTextGroup: { flex: 1, paddingRight: 10 },
+  bannerEventName: { color: '#FFFFFF', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  bannerEventSub: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 13, marginTop: 4 },
+  gameIllustration: { width: 70, height: 70, justifyContent: 'center', alignItems: 'center' },
 
-  bannerIcone: {
-    alignSelf: "flex-end",
-    marginBottom: 12,
-  },
+  mainCard: { flex: 1, backgroundColor: '#F8F7FC', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  cardSectionTitle: { fontSize: 17, fontWeight: '800', color: '#1F192F', marginBottom: 14 },
 
-  selo: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#6500CC",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    gap: 6,
-    marginBottom: 14,
-  },
+  infoRowBlock: { flexDirection: 'row', gap: 12, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#EDE8F5', marginBottom: 12 },
+  infoIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
+  infoIconBoxSmall: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  infoContent: { flex: 1 },
+  infoLabel: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+  infoValueBold: { fontSize: 14, color: '#1F192F', fontWeight: '700', marginTop: 2 },
+  infoDescriptionText: { fontSize: 13, color: '#4B5563', lineHeight: 19, marginTop: 4 },
 
-  seloTexto: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "bold",
-  },
+  gridRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  gridCol: { flex: 1, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#EDE8F5' },
 
-  nomeEvento: {
-    color: "#FFFFFF",
-    fontSize: 25,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
+  situationRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#EDE8F5', marginBottom: 12 },
 
-  localBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
+  adminButtonsRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  btnEditar: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F3E8FF', borderWidth: 1, borderColor: '#DDD6FE', height: 46, borderRadius: 12 },
+  btnEditarText: { color: '#6D28D9', fontWeight: '700', fontSize: 13 },
+  btnEncerrar: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FCA5A5', height: 46, borderRadius: 12 },
+  btnEncerrarText: { color: '#DC2626', fontWeight: '700', fontSize: 13 },
 
-  localBannerTexto: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    flex: 1,
-  },
+  warningNote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F4F6', padding: 10, borderRadius: 10 },
+  warningNoteText: { flex: 1, fontSize: 11, color: '#6B7280' },
 
-  statusBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    marginTop: 18,
-    gap: 7,
-  },
+  quickAccessGrid: { gap: 10 },
+  quickAccessCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#EDE8F5' },
+  quickIconBox: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
+  quickCardTitle: { fontSize: 14, fontWeight: '700', color: '#1F192F' },
+  quickCardSub: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
 
-  statusPonto: {
-    width: 8,
-    height: 8,
-    borderRadius: 10,
-    backgroundColor: "#8000FF",
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  bottomSheetCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  sheetOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  sheetOptionText: { fontSize: 15, fontWeight: '700', color: '#1F192F' },
 
-  statusBannerTexto: {
-    color: "#6500CC",
-    fontWeight: "bold",
-    fontSize: 12,
-  },
-
-  tituloSecao: {
-    fontSize: 19,
-    fontWeight: "bold",
-    color: "#222222",
-    marginBottom: 12,
-  },
-
-  subtitulo: {
-    fontSize: 13,
-    color: "#777777",
-    marginTop: -5,
-    marginBottom: 15,
-  },
-
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: "#E7E1F0",
-  },
-
-  informacao: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
-  },
-
-  informacaoTexto: {
-    flex: 1,
-  },
-
-  iconeInformacao: {
-    width: 43,
-    height: 43,
-    borderRadius: 25,
-    backgroundColor: "#F1E8FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  rotulo: {
-    color: "#777777",
-    fontSize: 12,
-    marginBottom: 5,
-  },
-
-  valor: {
-    color: "#222222",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  divisor: {
-    height: 1,
-    backgroundColor: "#EEEEEE",
-    marginVertical: 12,
-  },
-
-  linhaDupla: {
-    flexDirection: "row",
-  },
-
-  informacaoMetade: {
-    flex: 1,
-    paddingHorizontal: 5,
-    gap: 5,
-  },
-
-  grade: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 28,
-  },
-
-  botaoFuncao: {
-    width: "48%",
-    minHeight: 125,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 15,
-    padding: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E7E1F0",
-  },
-
-  nomeFuncao: {
-    color: "#222222",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginTop: 9,
-  },
-
-  descricaoFuncao: {
-    color: "#777777",
-    fontSize: 11,
-    marginTop: 5,
-    textAlign: "center",
-  },
-
-  botaoEditar: {
-    backgroundColor: "#8000FF",
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 12,
-  },
-
-  textoBotao: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 15,
-  },
-
-  botaoEncerrar: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#F2B8C0",
-  },
-
-  textoBotaoEncerrar: {
-    color: "#D92D45",
-    fontWeight: "bold",
-    fontSize: 15,
-  },
-
-  rodape: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 28,
-  },
-
-  textoRodape: {
-    color: "#888888",
-    fontSize: 12,
-  },
+  modalOverlayCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  alertCard: { width: '100%', maxWidth: 320, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 22, alignItems: 'center' },
+  powerIconBadge: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  alertTitle: { fontSize: 18, fontWeight: '800', color: '#1F192F', marginBottom: 6 },
+  alertSub: { fontSize: 12, color: '#6B7280', textAlign: 'center', lineHeight: 18, marginBottom: 20 },
+  btnConfirmDanger: { width: '100%', height: 48, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  btnConfirmDangerText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  btnCancelDialog: { width: '100%', height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  btnCancelDialogText: { color: '#4B5563', fontWeight: '700', fontSize: 14 },
 });
