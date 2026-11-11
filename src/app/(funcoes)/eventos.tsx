@@ -195,10 +195,46 @@ export default function Eventos() {
     setAnoAtual(novoAno);
   };
 
-  const ehDiaPassado = (dia: number) => {
-    const dataVerificar = new Date(anoAtual, mesAtual, dia, 23, 59, 59);
+  const ehDiaDesabilitado = (dia: number) => {
+    const dataVerificar = new Date(anoAtual, mesAtual, dia);
     const dataHojeZerada = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    return dataVerificar < dataHojeZerada;
+    
+    if (situacao === 'em_andamento' && campoAtivo === 'dataInicio') {
+      return dataVerificar.getTime() !== dataHojeZerada.getTime();
+    }
+
+    const dataFinalDia = new Date(anoAtual, mesAtual, dia, 23, 59, 59);
+    return dataFinalDia < dataHojeZerada;
+  };
+
+  const aplicarValoresHojeAgora = () => {
+    setSituacao('em_andamento');
+    const agora = new Date();
+    const dataHojeStr = `${formatarNumero(agora.getDate())}/${formatarNumero(agora.getMonth() + 1)}/${agora.getFullYear()}`;
+    const horaAgoraStr = `${formatarNumero(agora.getHours())}:${formatarNumero(agora.getMinutes())}`;
+
+    setDataInicio(dataHojeStr);
+    setHorarioInicio(horaAgoraStr);
+
+    if (erros.dataInicio) setErros((prev) => ({ ...prev, dataInicio: false }));
+    if (erros.horarioInicio) setErros((prev) => ({ ...prev, horarioInicio: false }));
+  };
+
+  const selecionarEmAndamento = () => {
+    if (situacao === 'em_andamento') return;
+
+    if (dataInicio || horarioInicio) {
+      Alert.alert(
+        'Alterar para "Iniciar Agora"?',
+        'Ao mudar para "Iniciar Agora", a data e o horário de início serão preenchidos automaticamente com a data e hora atuais. Deseja continuar?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Confirmar', onPress: aplicarValoresHojeAgora },
+        ]
+      );
+    } else {
+      aplicarValoresHojeAgora();
+    }
   };
 
   const confirmarSelecao = () => {
@@ -255,6 +291,23 @@ export default function Eventos() {
     
     if (!horarioInicio) novosErros.horarioInicio = 'Hora obrigatória';
     else if (!validarHorarioValido(horarioInicio)) novosErros.horarioInicio = 'Hora inválida (00:00 a 23:59)';
+
+    // TRAVA DE SEGURANÇA: Se for modo agendado e a data for hoje, o horário não pode ser no passado
+    if (!novosErros.dataInicio && !novosErros.horarioInicio && situacao === 'agendado') {
+      const dInicio = converterParaData(dataInicio);
+      const dataHojeZerada = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      
+      if (dInicio.getTime() === dataHojeZerada.getTime()) {
+        const [hIni, mIni] = horarioInicio.split(':').map(Number);
+        const agora = new Date();
+        const horaAtualMinutos = agora.getHours() * 60 + agora.getMinutes();
+        const horarioEscolhidoMinutos = hIni * 60 + mIni;
+
+        if (horarioEscolhidoMinutos <= horaAtualMinutos) {
+          novosErros.horarioInicio = 'Para hoje, o horário deve ser futuro. Use "Iniciar Agora" se o evento já começou.';
+        }
+      }
+    }
 
     let dataTerminoInvalida = false;
     if (dataTermino.length > 0) {
@@ -464,16 +517,10 @@ export default function Eventos() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.statusOption, situacao === 'em_andamento' && styles.statusOptionActive]}
-                onPress={() => {
-                  setSituacao('em_andamento');
-                  if (!horarioInicio) {
-                    const agora = new Date();
-                    setHorarioInicio(`${formatarNumero(agora.getHours())}:${formatarNumero(agora.getMinutes())}`);
-                  }
-                }}
+                onPress={selecionarEmAndamento}
               >
                 <Ionicons name="play-circle-outline" size={19} color={situacao === 'em_andamento' ? '#FFFFFF' : '#6B7280'} />
-                <Text style={[styles.statusText, situacao === 'em_andamento' && styles.statusTextActive]} numberOfLines={1}>Em andamento</Text>
+                <Text style={[styles.statusText, situacao === 'em_andamento' && styles.statusTextActive]} numberOfLines={1}>Iniciar Agora</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -518,7 +565,7 @@ export default function Eventos() {
                   {Array.from({ length: primeiroDiaSemana }).map((_, idx) => <View key={`empty-${idx}`} style={styles.dayCell} />)}
                   {Array.from({ length: diasNoMes }).map((_, idx) => {
                     const dia = idx + 1;
-                    const desabilitado = ehDiaPassado(dia);
+                    const desabilitado = ehDiaDesabilitado(dia);
                     const selecionado = dia === diaSelecionado;
                     return (
                       <TouchableOpacity
@@ -540,18 +587,29 @@ export default function Eventos() {
                   <View style={styles.modalHeadingText}>
                     <Text style={styles.modalTitle}>Escolha um horário</Text>
                     <Text style={styles.modalSubtitle}>
-                      {modoTeclado ? 'Digite o horário exato (HH:MM)' : (situacao === 'em_andamento' ? 'Minutos completos (00 a 59)' : 'Inicia em 00:00 (5 em 5 min)')}
+                      {modoTeclado ? 'Modo digitação manual' : (situacao === 'em_andamento' ? 'Minutos completos (00 a 59)' : 'Inicia em 00:00 (5 em 5 min)')}
                     </Text>
                   </View>
-                  <TouchableOpacity 
-                    onPress={() => setModoTeclado(!modoTeclado)} 
-                    style={styles.keyboardSwitchButton}
-                    accessibilityLabel="Alternar entre roleta e teclado"
-                  >
-                    <Ionicons name={modoTeclado ? "options-outline" : "keypad-outline"} size={20} color="#7C3AED" />
-                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => setPickerVisivel(false)} style={styles.closeButton}>
                     <Ionicons name="close" size={22} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modeSwitchBar}>
+                  <TouchableOpacity 
+                    style={[styles.modeSwitchTab, !modoTeclado && styles.modeSwitchTabActive]}
+                    onPress={() => setModoTeclado(false)}
+                  >
+                    <Ionicons name="options-outline" size={16} color={!modoTeclado ? '#7C3AED' : '#6B7280'} />
+                    <Text style={[styles.modeSwitchText, !modoTeclado && styles.modeSwitchTextActive]}>Roleta</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.modeSwitchTab, modoTeclado && styles.modeSwitchTabActive]}
+                    onPress={() => setModoTeclado(true)}
+                  >
+                    <Ionicons name="keypad-outline" size={16} color={modoTeclado ? '#7C3AED' : '#6B7280'} />
+                    <Text style={[styles.modeSwitchText, modoTeclado && styles.modeSwitchTextActive]}>Teclado</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -666,15 +724,20 @@ const styles = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(27, 20, 42, 0.42)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 19, width: '100%', maxWidth: 360, borderWidth: 1, borderColor: '#EEEAF5', shadowColor: '#24163D', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   modalHeaderIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F0EAFE', alignItems: 'center', justifyContent: 'center' },
   modalHeadingText: { flex: 1 },
   modalTitle: { color: '#292238', fontSize: 16, fontWeight: '800' },
   modalSubtitle: { color: '#8A8496', fontSize: 11, marginTop: 2 },
-  keyboardSwitchButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F2EDFC', alignItems: 'center', justifyContent: 'center' },
   closeButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F6F4F9', alignItems: 'center', justifyContent: 'center' },
 
-  keyboardInputWrapper: { paddingVertical: 32, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  modeSwitchBar: { flexDirection: 'row', backgroundColor: '#F2EDFC', borderRadius: 10, padding: 3, marginBottom: 16 },
+  modeSwitchTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8 },
+  modeSwitchTabActive: { backgroundColor: '#FFFFFF', shadowColor: '#33205B', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  modeSwitchText: { fontSize: 12, fontWeight: '700', color: '#6B7280' },
+  modeSwitchTextActive: { color: '#7C3AED' },
+
+  keyboardInputWrapper: { paddingVertical: 24, alignItems: 'center', justifyContent: 'center', gap: 12 },
   keyboardInputLabel: { fontSize: 13, fontWeight: '700', color: '#6D28D9' },
   keyboardDirectInput: { width: '80%', height: 56, borderWidth: 2, borderColor: '#7C3AED', borderRadius: 14, backgroundColor: '#FAF9FC', textAlign: 'center', fontSize: 26, fontWeight: '800', color: '#292238', fontVariant: ['tabular-nums'] },
   keyboardHintText: { fontSize: 11, color: '#8A8496' },
@@ -711,14 +774,14 @@ const styles = StyleSheet.create({
   wheelScroll: { flex: 1, zIndex: 1 },
   wheelContent: { paddingVertical: 69 },
   wheelItem: { height: 46, alignItems: 'center', justifyContent: 'center' },
-  wheelNumber: { color: '#AAA4B4', fontSize: 21, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  wheelNumberSelected: { color: '#6D28D9', fontSize: 27, fontWeight: '900' },
+  wheelNumber: { color: '#AAA4B4', fontSize: 18, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  wheelNumberSelected: { color: '#6D28D9', fontSize: 24, fontWeight: '900' },
   timeColon: { color: '#7C3AED', fontSize: 28, fontWeight: '800', marginTop: 24 },
   timeSelectedPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F7F3FF', borderRadius: 11, paddingVertical: 10, marginTop: 14 },
   timePreviewText: { color: '#6B6478', fontSize: 12 },
   timePreviewStrong: { color: '#6D28D9', fontWeight: '900', fontVariant: ['tabular-nums'] },
 
-  modalActions: { flexDirection: 'row', gap: 8, marginTop: 20 },
+  modalActions: { flexDirection: 'row', gap: 8, marginTop: 16 },
   modalClearButton: { flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2' },
   modalClearText: { color: '#DC2626', fontWeight: '700', fontSize: 12 },
   modalCancelButton: { flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: '#E5E0EC', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
