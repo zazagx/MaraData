@@ -120,13 +120,6 @@ function ConteudoLayout() {
           }}
         />
 
-        <Drawer.Screen
-          name="about"
-          options={{
-            title: "Sobre",
-            drawerLabel: "Sobre",
-          }}
-        />
       </Drawer>
     </>
   );

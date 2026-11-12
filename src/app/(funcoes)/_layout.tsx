@@ -33,11 +33,6 @@ export default function FuncoesLayout() {
       />
 
       <Stack.Screen
-        name="eventos/cadastro"
-        options={{ title: 'Evento cadastrado' }}
-      />
-
-      <Stack.Screen
         name="filas"
         options={{ headerShown: false }}
       />
@@ -53,7 +48,7 @@ export default function FuncoesLayout() {
       />
 
       <Stack.Screen
-        name="eventos/historico/index"
+        name="eventos/historico"
         options={{ title: 'Histórico de Eventos' }}
       />
     </Stack>

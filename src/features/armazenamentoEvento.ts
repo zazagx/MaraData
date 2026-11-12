@@ -1,6 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { criarId } from '../database/ids';
 import type { Participante } from './armazenamentoParticipantes';
+import {
+  finalizarDiasAoEncerrarEvento,
+  registrarPresencaNoDiaAtivo,
+  sincronizarDiasDoEventoNoBanco,
+} from './armazenamentoPresencasFeedback';
 
 export type SituacaoEvento = 'agendado' | 'em_andamento' | 'encerrado';
 
@@ -128,13 +133,21 @@ export async function salvarEvento(db: SQLiteDatabase, dados: DadosEvento): Prom
       const possuiOperacao = await db.getFirstAsync<{ possui: number }>(
         `SELECT (
            EXISTS (SELECT 1 FROM event_participants WHERE event_id = ?) OR
-           EXISTS (SELECT 1 FROM event_queues WHERE event_id = ?)
+           EXISTS (SELECT 1 FROM event_queues WHERE event_id = ?) OR
+           EXISTS (SELECT 1 FROM event_days WHERE event_id = ? AND status <> 'nao_iniciado') OR
+           EXISTS (
+             SELECT 1 FROM event_participant_days epd
+             INNER JOIN event_days ed ON ed.id = epd.event_day_id
+             WHERE ed.event_id = ?
+           )
          ) AS possui`,
+        id,
+        id,
         id,
         id
       );
       if (possuiOperacao?.possui) {
-        throw new Error('Este evento já possui participantes ou filas. Para finalizar, utilize a opção Encerrar evento.');
+        throw new Error('A operação deste evento já foi iniciada. Para voltar ao estado agendado, primeiro seria necessário desfazer os registros; utilize a opção Encerrar evento para finalizá-lo.');
       }
     }
 
@@ -202,6 +215,11 @@ export async function salvarEvento(db: SQLiteDatabase, dados: DadosEvento): Prom
     }
 
     await registrarEventoOutbox(db, evento);
+    await sincronizarDiasDoEventoNoBanco(
+      db,
+      evento,
+      dados.situacao === 'em_andamento' && existente?.situacao !== 'em_andamento'
+    );
     salvo = evento;
   });
 
@@ -288,7 +306,8 @@ export async function buscarParticipantesDoEvento(
 export async function registrarParticipanteNoEvento(
   db: SQLiteDatabase,
   eventId: string,
-  participantId: string
+  participantId: string,
+  origemPresenca: 'manual' | 'fila' = 'manual'
 ): Promise<{ eventParticipantId: string; jaExistia: boolean }> {
   let resultado: { eventParticipantId: string; jaExistia: boolean } | null = null;
 
@@ -324,6 +343,7 @@ export async function registrarParticipanteNoEvento(
     );
 
     if (existente) {
+      await registrarPresencaNoDiaAtivo(db, eventId, existente.id, origemPresenca);
       resultado = { eventParticipantId: existente.id, jaExistia: true };
       return;
     }
@@ -401,6 +421,9 @@ export async function registrarParticipanteNoEvento(
       );
     }
 
+    // Se já existe um dia operacional em andamento, o vínculo indica que a
+    // pessoa está presente hoje. A presença é registrada separadamente da inscrição.
+    await registrarPresencaNoDiaAtivo(db, eventId, id, origemPresenca);
     resultado = { eventParticipantId: id, jaExistia: false };
   });
 
@@ -433,6 +456,7 @@ export async function encerrarEvento(db: SQLiteDatabase, eventoId: string): Prom
       eventoId
     );
     await registrarEventoOutbox(db, eventoAtualizado);
+    await finalizarDiasAoEncerrarEvento(db, eventoId);
 
     // Encerrar o evento também encerra todas as filas abertas vinculadas a ele.
     const filasAbertas = await db.getAllAsync<{

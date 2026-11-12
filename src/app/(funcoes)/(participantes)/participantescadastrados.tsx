@@ -8,11 +8,24 @@ import {
   buscarParticipantesDoEvento,
   registrarParticipanteNoEvento,
 } from '../../../features/armazenamentoEvento';
+import {
+  buscarDiasEvento,
+  buscarIdsPresentesNoDia,
+  buscarParticipantesDoDia,
+  buscarResumoPresencasEvento,
+  concluirDiaEvento,
+  definirPresencaManual,
+  iniciarDiaEvento,
+  formatarDataDiaEvento,
+  type DiaEvento,
+  type ResumoPresencasEvento,
+} from '../../../features/armazenamentoPresencasFeedback';
 
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
+import { Ionicons } from '@expo/vector-icons';
 import {
   Alert,
   FlatList,
@@ -76,55 +89,110 @@ export default function ParticipantesCadastrados() {
   const [carregando, setCarregando] = useState(true)
   const [erroCarregamento, setErroCarregamento] = useState('')
   const [participantesNoEvento, setParticipantesNoEvento] = useState<Set<string>>(new Set());
+  const [secaoEvento, setSecaoEvento] = useState<'geral' | 'dias'>('geral');
+  const [diasEvento, setDiasEvento] = useState<DiaEvento[]>([]);
+  const [diaSelecionadoId, setDiaSelecionadoId] = useState('');
+  const [participantesDoDia, setParticipantesDoDia] = useState<Participante[]>([]);
+  const [presentesNoDia, setPresentesNoDia] = useState<Set<string>>(new Set());
+  const [resumoPresencas, setResumoPresencas] = useState<ResumoPresencasEvento | null>(null);
+  const [modalPresencaVisivel, setModalPresencaVisivel] = useState(false);
+  const [buscaPresenca, setBuscaPresenca] = useState('');
 
-
-  // Reconsulta o SQLite sempre que a tela volta a ficar ativa.
-  // Quando há eventId, a lista principal contém somente participantes inscritos
-  // naquele evento. A lista global é mantida separadamente para permitir novos vínculos.
+  // Reconsulta os participantes, dias e presenças sempre que a tela recebe foco.
   useFocusEffect(
     useCallback(() => {
       let ativo = true;
-      setCarregando(true);
-      setErroCarregamento('');
 
-      Promise.all([
-        eventId
-          ? buscarParticipantesDoEvento(db, eventId)
-          : buscarParticipantes(db),
-        eventId
-          ? buscarParticipantes(db)
-          : Promise.resolve([] as Participante[]),
-      ])
-        .then(([dadosVisiveis, todos]) => {
-          if (ativo) {
-            setParticipantes(dadosVisiveis);
-            setTodosParticipantes(todos);
-            setParticipantesNoEvento(
-              new Set(eventId ? dadosVisiveis.map((item) => item.id) : [])
-            );
+      async function carregar() {
+        setCarregando(true);
+        setErroCarregamento('');
+        try {
+          const [dadosVisiveis, todos, dias, resumo] = await Promise.all([
+            eventId ? buscarParticipantesDoEvento(db, eventId) : buscarParticipantes(db),
+            eventId ? buscarParticipantes(db) : Promise.resolve([] as Participante[]),
+            eventId ? buscarDiasEvento(db, eventId) : Promise.resolve([] as DiaEvento[]),
+            eventId ? buscarResumoPresencasEvento(db, eventId) : Promise.resolve(null),
+          ]);
+          if (!ativo) return;
+
+          setParticipantes(dadosVisiveis);
+          setTodosParticipantes(todos);
+          setParticipantesNoEvento(new Set(eventId ? dadosVisiveis.map((item) => item.id) : []));
+          setDiasEvento(dias);
+          setResumoPresencas(resumo);
+
+          const diaInicial = dias.find((dia) => dia.status === 'em_andamento') ?? dias[0];
+          setDiaSelecionadoId(diaInicial?.id ?? '');
+          if (diaInicial) {
+            const [presentes, ids] = await Promise.all([
+              buscarParticipantesDoDia(db, diaInicial.id),
+              buscarIdsPresentesNoDia(db, diaInicial.id),
+            ]);
+            if (ativo) {
+              setParticipantesDoDia(presentes);
+              setPresentesNoDia(new Set(ids));
+            }
+          } else {
+            setParticipantesDoDia([]);
+            setPresentesNoDia(new Set());
           }
-        })
-        .catch((erro: unknown) => {
-          console.error('Erro ao consultar participantes:', erro);
-          if (ativo) setErroCarregamento('Não foi possível carregar os participantes salvos.');
-        })
-        .finally(() => {
+        } catch (erro) {
+          console.error('Erro ao consultar participantes e presenças:', erro);
+          if (ativo) setErroCarregamento('Não foi possível carregar os dados deste evento.');
+        } finally {
           if (ativo) setCarregando(false);
-        });
+        }
+      }
 
-      return () => {
-        ativo = false;
-      };
+      void carregar();
+      return () => { ativo = false; };
     }, [db, eventId])
-  )
+  );
+
+  async function atualizarDiaSelecionado(diaId: string) {
+    setDiaSelecionadoId(diaId);
+    const [presentes, ids, dias, resumo] = await Promise.all([
+      buscarParticipantesDoDia(db, diaId),
+      buscarIdsPresentesNoDia(db, diaId),
+      eventId ? buscarDiasEvento(db, eventId) : Promise.resolve([] as DiaEvento[]),
+      eventId ? buscarResumoPresencasEvento(db, eventId) : Promise.resolve(null),
+    ]);
+    setParticipantesDoDia(presentes);
+    setPresentesNoDia(new Set(ids));
+    setDiasEvento(dias);
+    setResumoPresencas(resumo);
+  }
+
+  async function atualizarPresenca(participanteId: string, presente: boolean) {
+    if (!diaSelecionadoId) return;
+    try {
+      await definirPresencaManual(db, diaSelecionadoId, participanteId, presente);
+      await atualizarDiaSelecionado(diaSelecionadoId);
+    } catch (erro) {
+      Alert.alert('Não foi possível atualizar a presença', erro instanceof Error ? erro.message : 'Tente novamente.');
+    }
+  }
+
+  async function alterarStatusDia(dia: DiaEvento) {
+    try {
+      if (dia.status === 'nao_iniciado') await iniciarDiaEvento(db, dia.id);
+      else if (dia.status === 'em_andamento') await concluirDiaEvento(db, dia.id);
+      await atualizarDiaSelecionado(dia.id);
+    } catch (erro) {
+      Alert.alert('Não foi possível atualizar o dia', erro instanceof Error ? erro.message : 'Tente novamente.');
+    }
+  }
 
 
   // Filters participants by name.
-  const participantesFiltrados = participantes.filter((participante) =>
+  const fonteParticipantes = eventId && secaoEvento === 'dias' ? participantesDoDia : participantes;
+  const participantesFiltrados = fonteParticipantes.filter((participante) =>
     participante.nome
       .toLocaleLowerCase('pt-BR')
       .includes(busca.trim().toLocaleLowerCase('pt-BR'))
   )
+
+  const diaSelecionado = diasEvento.find((dia) => dia.id === diaSelecionadoId) ?? null;
 
   // Na tela de um evento, permite localizar pessoas do cadastro geral que
   // ainda não foram vinculadas a ele, sem misturá-las à lista de participantes.
@@ -158,6 +226,7 @@ export default function ParticipantesCadastrados() {
       setParticipantesNoEvento(
         new Set(inscritosAtualizados.map((item) => item.id))
       );
+      if (diaSelecionadoId) await atualizarDiaSelecionado(diaSelecionadoId);
       setModalVincularVisivel(false);
       setParticipanteSelecionado(null);
 
@@ -216,6 +285,86 @@ export default function ParticipantesCadastrados() {
 
         ListHeaderComponent={
           <View>
+            {eventId && (
+              <View style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', backgroundColor: tema.surfaceSecondary, borderRadius: 12, padding: 4, gap: 4 }}>
+                  <Pressable
+                    onPress={() => setSecaoEvento('geral')}
+                    style={{ flex: 1, paddingVertical: 11, borderRadius: 9, alignItems: 'center', backgroundColor: secaoEvento === 'geral' ? tema.primary : 'transparent' }}
+                  >
+                    <Text style={{ color: secaoEvento === 'geral' ? tema.primaryText : tema.textSecondary, fontWeight: '700' }}>Participantes gerais</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setSecaoEvento('dias')}
+                    style={{ flex: 1, paddingVertical: 11, borderRadius: 9, alignItems: 'center', backgroundColor: secaoEvento === 'dias' ? tema.primary : 'transparent' }}
+                  >
+                    <Text style={{ color: secaoEvento === 'dias' ? tema.primaryText : tema.textSecondary, fontWeight: '700' }}>Por dia</Text>
+                  </Pressable>
+                </View>
+
+                {secaoEvento === 'dias' && (
+                  <View style={{ marginTop: 14 }}>
+                    {resumoPresencas && (
+                      <View style={{ backgroundColor: tema.surface, borderColor: tema.border, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                        <Text style={{ color: tema.text, fontWeight: '800', marginBottom: 5 }}>Resumo de presença</Text>
+                        <Text style={{ color: tema.textSecondary, fontSize: 12 }}>Pessoas únicas: {resumoPresencas.participantesUnicosPresentes}  •  Presenças: {resumoPresencas.totalPresencas}</Text>
+                        <Text style={{ color: tema.textSecondary, fontSize: 12 }}>Retornaram em outro dia: {resumoPresencas.participantesRecorrentes}</Text>
+                      </View>
+                    )}
+
+                    {diasEvento.length > 0 ? (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 8 }}>
+                        {diasEvento.map((dia) => (
+                          <Pressable
+                            key={dia.id}
+                            onPress={() => void atualizarDiaSelecionado(dia.id)}
+                            style={{ paddingVertical: 10, paddingHorizontal: 13, borderRadius: 11, backgroundColor: diaSelecionadoId === dia.id ? tema.primary : tema.surface, borderWidth: 1, borderColor: diaSelecionadoId === dia.id ? tema.primary : tema.border }}
+                          >
+                            <Text style={{ color: diaSelecionadoId === dia.id ? tema.primaryText : tema.text, fontWeight: '700', fontSize: 12 }}>Dia {dia.numero}</Text>
+                            <Text style={{ color: diaSelecionadoId === dia.id ? tema.primaryText : tema.textSecondary, fontSize: 11 }}>{formatarDataDiaEvento(dia.data)}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      <Text style={{ color: tema.textSecondary, padding: 12 }}>Nenhum dia foi configurado para este evento.</Text>
+                    )}
+
+                    {diaSelecionado && (
+                      <View style={{ backgroundColor: tema.surface, borderColor: tema.border, borderWidth: 1, borderRadius: 12, padding: 13, marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <Text style={{ color: tema.text, fontWeight: '800' }}>Dia {diaSelecionado.numero}</Text>
+                          <Text style={{ color: diaSelecionado.status === 'em_andamento' ? '#16A36A' : tema.textSecondary, fontSize: 11, fontWeight: '700' }}>
+                            {diaSelecionado.status === 'em_andamento' ? 'EM ANDAMENTO' : diaSelecionado.status === 'concluido' ? 'CONCLUÍDO' : diaSelecionado.status === 'nao_realizado' ? 'NÃO REALIZADO' : 'NÃO INICIADO'}
+                          </Text>
+                        </View>
+                        <Text style={{ color: tema.textSecondary, fontSize: 12, marginBottom: 10 }}>{presentesNoDia.size} participante(s) com presença registrada.</Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {!eventoEncerrado && diaSelecionado.status === 'nao_iniciado' && params.situacao === 'em_andamento' && (
+                            <Pressable onPress={() => void alterarStatusDia(diaSelecionado)} style={{ flex: 1, backgroundColor: tema.primary, padding: 11, borderRadius: 9, alignItems: 'center' }}>
+                              <Text style={{ color: tema.primaryText, fontWeight: '700' }}>Iniciar dia</Text>
+                            </Pressable>
+                          )}
+                          {!eventoEncerrado && diaSelecionado.status === 'em_andamento' && (
+                            <Pressable onPress={() => void alterarStatusDia(diaSelecionado)} style={{ flex: 1, backgroundColor: '#16865B', padding: 11, borderRadius: 9, alignItems: 'center' }}>
+                              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Concluir dia</Text>
+                            </Pressable>
+                          )}
+                          {(diaSelecionado.status === 'em_andamento' || diaSelecionado.status === 'concluido') && (
+                            <Pressable onPress={() => { setBuscaPresenca(''); setModalPresencaVisivel(true); }} style={{ flex: 1, backgroundColor: tema.surfaceSecondary, padding: 11, borderRadius: 9, alignItems: 'center' }}>
+                              <Text style={{ color: tema.primary, fontWeight: '700' }}>{eventoEncerrado ? 'Corrigir presenças' : 'Gerenciar presença'}</Text>
+                            </Pressable>
+                          )}
+                        </View>
+                        {diaSelecionado.status === 'nao_iniciado' && params.situacao !== 'em_andamento' && (
+                          <Text style={{ color: tema.textSecondary, fontSize: 12 }}>Inicie o evento para liberar o controle de presença diária.</Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
             <View style={styles.buscaContainer}>
               <Text style={styles.iconeBusca}>⌕</Text>
               <TextInput
@@ -250,9 +399,11 @@ export default function ParticipantesCadastrados() {
                 ? 'Carregando participantes...'
                 : erroCarregamento || (busca
                   ? 'Nenhum participante encontrado.'
-                  : eventId
-                    ? 'Nenhum participante vinculado a este evento ainda.'
-                    : 'Nenhum participante cadastrado ainda.')}
+                  : eventId && secaoEvento === 'dias'
+                    ? 'Nenhuma presença registrada neste dia.'
+                    : eventId
+                      ? 'Nenhum participante vinculado a este evento ainda.'
+                      : 'Nenhum participante cadastrado ainda.')}
             </Text>
 
             {!carregando && !erroCarregamento && !busca && (
@@ -406,7 +557,18 @@ export default function ParticipantesCadastrados() {
       {eventId && participanteSelecionado && (
         <View style={styles.acoesModal}>
           {participantesNoEvento.has(participanteSelecionado.id) ? (
-            <Text style={styles.participanteVinculado}>Este participante já está vinculado a este evento.</Text>
+            <>
+              <Text style={styles.participanteVinculado}>Este participante já está vinculado a este evento.</Text>
+              <Pressable
+                style={[styles.botaoAdicionarEvento, { marginTop: 8, backgroundColor: tema.surfaceSecondary }]}
+                onPress={() => {
+                  setParticipanteSelecionado(null);
+                  router.push({ pathname: '/feedback', params: { eventId, participantId: participanteSelecionado.id } });
+                }}
+              >
+                <Text style={[styles.textoBotaoAdicionarEvento, { color: tema.primary }]}>Registrar / consultar feedback</Text>
+              </Pressable>
+            </>
           ) : (
             <Pressable style={styles.botaoAdicionarEvento} onPress={adicionarParticipanteSelecionadoAoEvento}>
               <Text style={styles.textoBotaoAdicionarEvento}>Adicionar participante a este evento</Text>
@@ -493,6 +655,64 @@ export default function ParticipantesCadastrados() {
           </View>
         </View>
       </Modal>
+
+      {eventId && diaSelecionado && (
+        <Modal
+          visible={modalPresencaVisivel}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setModalPresencaVisivel(false)}
+        >
+          <View style={styles.fundoModal}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalPresencaVisivel(false)} />
+            <View style={[styles.modalVincularCard, { backgroundColor: tema.surface }]}>
+              <View style={styles.modalCabecalho}>
+                <View style={styles.identificacaoModal}>
+                  <Text style={[styles.nomeModal, { color: tema.text }]}>Presenças — Dia {diaSelecionado.numero}</Text>
+                  <Text style={[styles.subtitulo, { color: tema.textSecondary }]}>Marque quem compareceu neste dia. Entradas em filas também registram presença automaticamente.</Text>
+                </View>
+                <Pressable style={styles.botaoFechar} onPress={() => setModalPresencaVisivel(false)}>
+                  <Text style={styles.textoFechar}>×</Text>
+                </Pressable>
+              </View>
+              <View style={styles.buscaContainer}>
+                <Text style={styles.iconeBusca}>⌕</Text>
+                <TextInput
+                  style={styles.campoBusca}
+                  placeholder="Buscar participante..."
+                  placeholderTextColor={tema.textSecondary}
+                  value={buscaPresenca}
+                  onChangeText={setBuscaPresenca}
+                />
+              </View>
+              <FlatList
+                data={participantes.filter((item) => item.nome.toLocaleLowerCase('pt-BR').includes(buscaPresenca.trim().toLocaleLowerCase('pt-BR')))}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 380 }}
+                ListEmptyComponent={<Text style={{ color: tema.textSecondary, textAlign: 'center', padding: 18 }}>Nenhum participante vinculado ao evento.</Text>}
+                renderItem={({ item }) => {
+                  const presente = presentesNoDia.has(item.id);
+                  return (
+                    <Pressable
+                      onPress={() => void atualizarPresenca(item.id, !presente)}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: tema.border, gap: 10 }}
+                    >
+                      <View style={{ width: 26, height: 26, borderRadius: 7, borderWidth: 1.5, borderColor: presente ? tema.primary : tema.border, backgroundColor: presente ? tema.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                        {presente && <Ionicons name="checkmark" size={18} color={tema.primaryText} />}
+                      </View>
+                      <Text style={{ color: tema.text, flex: 1, fontWeight: '600' }}>{item.nome}</Text>
+                      <Text style={{ color: tema.textSecondary, fontSize: 12 }}>{presente ? 'Presente' : 'Ausente'}</Text>
+                    </Pressable>
+                  );
+                }}
+              />
+              <Pressable onPress={() => setModalPresencaVisivel(false)} style={[styles.botaoAdicionarEvento, { marginTop: 12 }]}>
+                <Text style={styles.textoBotaoAdicionarEvento}>Concluir</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </View>
   )

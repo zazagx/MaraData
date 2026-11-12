@@ -66,6 +66,16 @@ export default function ParticipantesLayout() {
         name="confirmacaoCadastroParticipante"
         options={{ title: 'Cadastro realizado' }}
       />
+
+      <Stack.Screen
+        name="feedbacks"
+        options={{ title: 'Feedbacks do evento' }}
+      />
+
+      <Stack.Screen
+        name="feedback"
+        options={{ title: 'Feedback do participante' }}
+      />
     </Stack>
   );
 }

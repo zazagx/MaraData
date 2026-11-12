@@ -251,7 +251,7 @@ export async function adicionarParticipanteAFila(
 
     // Garante que o participante pertença ao evento, criando um snapshot
     // demográfico e dos jogos na primeira inscrição.
-    const inscricao = await registrarParticipanteNoEvento(db, filaAntes.event_id, participantId);
+    const inscricao = await registrarParticipanteNoEvento(db, filaAntes.event_id, participantId, 'fila');
 
     await db.withTransactionAsync(async () => {
       const filaAtual = await buscarFilaRow(db, filaId);

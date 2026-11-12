@@ -305,6 +305,20 @@ export default function DetalhesEvento() {
               </View>
               <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickAccessCard}
+              onPress={() => router.push({ pathname: '/feedbacks', params: { eventId: eventId || '', nomeEvento } })}
+            >
+              <View style={styles.quickIconBox}>
+                <Ionicons name="chatbox-ellipses-outline" size={22} color={tema.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickCardTitle}>Feedbacks</Text>
+                <Text style={styles.quickCardSub}>Registrar e consultar opiniões</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
+            </TouchableOpacity>
           </View>
 
         </View>
