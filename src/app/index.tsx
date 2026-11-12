@@ -1,5 +1,10 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {Ionicons} from '@expo/vector-icons';
+import {
+  buscarEventoAtivo,
+  type EventoAtivo,
+} from '../features/armazenamentoEvento';
 
 import { useEvento } from '../context/eventocontexto';
 
@@ -46,7 +51,10 @@ export default function Home() {
   }
 
   return (
-    <>
+    
+    <View style={styles.homePage}>
+      <View style={styles.conteudo}>
+
       {/* CARD DO EVENTO */}
       <Pressable
         style={styles.eventoCard}
@@ -68,70 +76,124 @@ export default function Home() {
             : '● Sem evento ativo'}
         </Text>
       </Pressable>
+      <View style={styles.tituloContainer}> 
 
-      {/* BOTÕES PRINCIPAIS */}
-      <View style={styles.homePage}>
-        <View style={styles.buttonCard}>
+        <Ionicons name="flash-outline"
+          size={25}
+          color="#6A0DAD"
+        />
 
-          <Pressable
-            onPress={() => router.push('/(funcoes)/(participantes)/participantescadastrados')}
-            style={button.button}
-          >
-            <Text style={button.buttonText}>
-              Participantes
-            </Text>
-          </Pressable>
+        <Text style={styles.tituloAtalho}>
+          Acesso rápido
+        </Text>
+    </View>
+        <View style={styles.grupoCartoes}>
+         <View style={styles.linhaCartoes}>
 
-          <Pressable
-            onPress={abrirFilas}
-            style={button.button}
-          >
-            <Text style={button.buttonText}>
-              Filas
-            </Text>
-          </Pressable>
+        <Pressable
+          onPress={() => router.push('/participantescadastrados')}
+          style={styles.cartao}
+        >
+          <Ionicons
+            name="people-outline"
+            size={42}
+            color="#6A0DAD"
+          />
 
-          <Pressable
-            onPress={() => router.push('/(funcoes)/estatistica')}
-            style={button.button}
-          >
-            <Text style={button.buttonText}>
-              Estatísticas
-            </Text>
-          </Pressable>
+          <Text style={styles.cartaoTitulo}>
+            Participantes
+          </Text>
 
-          <Pressable
-            onPress={() => router.push('/(funcoes)/eventos')}
-            style={button.button}
-          >
-            <Text style={button.buttonText}>
-              Eventos
-            </Text>
-          </Pressable>
-    
-          <Pressable
-            onPress={() => router.push('/(funcoes)/eventos/historico')}
-            style={button.button}
-          >
-            <Text style={button.buttonText}>
-              Histórico
-            </Text>
-          </Pressable>
-        
+          <Text style={styles.cartaoDescricao}>
+            Cadastre e consulte
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={abrirFilas}
+          style={styles.cartao}
+        >
+          <Ionicons
+            name="people-circle-outline"
+            size={42}
+            color="#6A0DAD"
+          />
+
+          <Text style={styles.cartaoTitulo}>
+            Fila Virtual
+          </Text>
+
+          <Text style={styles.cartaoDescricao}>
+            Gerencie a fila
+          </Text>
+        </Pressable>
+
         </View>
+
+     
+      <View style={styles.linhaCartoes}>
+
+        <Pressable
+          onPress={() => router.push('/estatistica')}
+          style={styles.cartao}
+        >
+          <Ionicons
+            name="stats-chart-outline"
+            size={42}
+            color="#6A0DAD"
+          />
+
+          <Text style={styles.cartaoTitulo}>
+            Estatísticas
+          </Text>
+
+          <Text style={styles.cartaoDescricao}>
+            Veja os resultados
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/eventos')}
+          style={styles.cartao}
+        >
+          <Ionicons
+            name="calendar-outline"
+            size={42}
+            color="#6A0DAD"
+          />
+
+          <Text style={styles.cartaoTitulo}>
+            Eventos
+          </Text>
+
+          <Text style={styles.cartaoDescricao}>
+            Acesse os eventos
+          </Text>
+        </Pressable>
       </View>
-    </>
-  );
+      </View>
+    </View>
+    </View>
+);
 }
 
 const styles = StyleSheet.create({
   homePage: {
     flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    justifyContent: 'center',
-    alignItems: 'center',
+    //fontSize: 24,
+    //fontWeight: 'bold',
+    //justifyContent: 'center',
+    alignItems: 'stretch',
   },
+
+  conteudo: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+},
 
   eventoCard: {
     backgroundColor: '#9e00fb',
@@ -148,28 +210,57 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  buttonCard: {
+  tituloContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 50,
-    marginBottom: 50,
-  },
-});
-
-const button = StyleSheet.create({
-  button: {
-    backgroundColor: '#005bfb',
-    width: '40%',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    borderRadius: 5,
     alignItems: 'center',
+    gap: 8,
+    marginTop: 32,
+    marginBottom: 15,
+},
+
+  tituloAtalho: {
+    color: '#35105F',
+    fontSize: 20,
+    fontWeight: 'bold',
+},
+
+  linhaCartoes: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+    
   },
 
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+  grupoCartoes: { //flex para mudar tamanho vertical do grupo de cartões
+  flex: 0.87,
+  gap: 12,
+},
+
+  cartao: {
+    flex: 1,
+    backgroundColor: '#F0E4FC',
+    borderRadius: 20,
+    borderWidth: 4,
+    borderColor: '#DFC5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
   },
+
+  cartaoTitulo: {
+    color: '#35105F',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+
+  cartaoDescricao: {
+    color: '#7540A8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 5,
+  },
+
 });
