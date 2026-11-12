@@ -2,13 +2,14 @@ import {
   adicionarJogo,
   buscarJogos,
   salvarParticipante,
-  type Participante
+  type DadosParticipante,
 } from '@/features/armazenamentoParticipantes';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { adicionarParticipanteAFila } from '@/features/armazenamentofilas';
 import { useLocalSearchParams } from 'expo-router';
@@ -223,13 +224,14 @@ function CampoSimNao({
 
 
 export default function novoparticipante() {
+  const db = useSQLiteContext();
   const { tema, modoEscuro } = useTema();
   const styles = useEstilosTema(estilosBase);
 
   const router = useRouter()
   const params = useLocalSearchParams<{ origem?: string; filaId?: string }>()
 
-  const [participante, setParticipante] = useState<Participante>({
+  const [participante, setParticipante] = useState<DadosParticipante>({
     nome: '',
     dataNascimento: '',
     genero: '',
@@ -256,8 +258,31 @@ export default function novoparticipante() {
 
 
   // Games catalogue and search.
-  const [jogosDisponiveis, setJogosDisponiveis] = useState(buscarJogos())
+  const [jogosDisponiveis, setJogosDisponiveis] = useState<string[]>([])
   const [buscaJogo, setBuscaJogo] = useState('')
+  const [erroPersistencia, setErroPersistencia] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [adicionandoJogo, setAdicionandoJogo] = useState(false)
+
+  // Carrega o catálogo salvo localmente. O primeiro catálogo começa vazio.
+  useEffect(() => {
+    let ativo = true;
+
+    buscarJogos(db)
+      .then((jogos) => {
+        if (ativo) setJogosDisponiveis(jogos);
+      })
+      .catch((erro: unknown) => {
+        console.error('Erro ao carregar o catálogo de jogos:', erro);
+        if (ativo) {
+          setErroPersistencia('Não foi possível carregar os jogos salvos neste dispositivo.');
+        }
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [db]);
 
 
   // Birthday picker.
@@ -270,7 +295,7 @@ export default function novoparticipante() {
 
   // Updates participant information.
   function alterarCampo(
-    campo: keyof Participante,
+    campo: keyof DadosParticipante,
     valor: string | string[]
   ) {
     setParticipante((anterior) => ({
@@ -389,35 +414,43 @@ export default function novoparticipante() {
   }
 
 
-  // Adds a new game to the shared catalogue.
-  function adicionarNovoJogo() {
+  // Adds a new game to the local SQLite catalogue.
+  async function adicionarNovoJogo() {
+    const nomeInformado = buscaJogo.trim();
+    if (nomeInformado === '' || adicionandoJogo) return;
 
-    const novoJogo = adicionarJogo(buscaJogo)
+    setAdicionandoJogo(true);
+    setErroPersistencia('');
 
-    if (novoJogo === '') return
+    try {
+      const novoJogo = await adicionarJogo(db, nomeInformado);
+      const catalogoAtualizado = await buscarJogos(db);
+      setJogosDisponiveis(catalogoAtualizado);
 
-    setJogosDisponiveis(buscarJogos())
+      setParticipante((anterior) => ({
+        ...anterior,
+        jogos: anterior.jogos.includes(novoJogo)
+          ? anterior.jogos
+          : [...anterior.jogos, novoJogo],
+      }));
 
-    setParticipante((anterior) => ({
-      ...anterior,
-
-      jogos: anterior.jogos.includes(novoJogo)
-        ? anterior.jogos
-        : [...anterior.jogos, novoJogo]
-    }))
-
-    setErros((anterior) => ({
-      ...anterior,
-      jogos: ''
-    }))
-
-    setBuscaJogo('')
-
+      setErros((anterior) => ({ ...anterior, jogos: '' }));
+      setBuscaJogo('');
+    } catch (erro) {
+      console.error('Erro ao adicionar jogo:', erro);
+      setErroPersistencia(
+        erro instanceof Error
+          ? erro.message
+          : 'Não foi possível salvar o jogo neste dispositivo.'
+      );
+    } finally {
+      setAdicionandoJogo(false);
+    }
   }
 
 
-  // Validates the form.
-  function validarCadastro() {
+  // Validates the form and persists the participant locally.
+  async function validarCadastro() {
 
     const novosErros = {
       nome: '',
@@ -475,40 +508,46 @@ export default function novoparticipante() {
     )
 
 
-if (!temErro) {
-
-  const participanteSalvo = {
+if (!temErro && !salvando) {
+  const participanteSalvo: DadosParticipante = {
     ...participante,
-    nome: participante.nome.trim()
-  }
+    nome: participante.nome.trim(),
+  };
 
-  salvarParticipante(participanteSalvo)
+  setSalvando(true);
+  setErroPersistencia('');
 
-  // Se o cadastro começou pela tela de filas,
-  // adiciona o participante diretamente à fila.
-  if (params.origem === 'fila' && params.filaId) {
+  try {
+    const participanteCriado = await salvarParticipante(db, participanteSalvo);
 
-    adicionarParticipanteAFila(params.filaId, {
-      nome: participanteSalvo.nome,
-      dataNascimento: participanteSalvo.dataNascimento,
-      jogos: participanteSalvo.jogos,
-    })
+    // Se o cadastro começou pela tela de filas, preserva o fluxo atual.
+    // A persistência das filas será migrada na próxima etapa.
+    if (params.origem === 'fila' && params.filaId) {
+      adicionarParticipanteAFila(params.filaId, {
+        nome: participanteCriado.nome,
+        dataNascimento: participanteCriado.dataNascimento,
+        jogos: participanteCriado.jogos,
+      });
+    }
 
     router.replace({
       pathname: '/confirmacaoCadastroParticipante',
       params: {
-        origem: 'fila',
-        filaId: params.filaId
+        participantId: participanteCriado.id,
+        ...(params.origem === 'fila' ? { origem: 'fila' } : {}),
+        ...(typeof params.filaId === 'string' ? { filaId: params.filaId } : {}),
       },
-    })
-
-  } else {
-
-    // Cadastro realizado pela tela normal de participantes.
-    router.replace('/confirmacaoCadastroParticipante')
-
+    });
+  } catch (erro) {
+    console.error('Erro ao salvar participante no SQLite:', erro);
+    setErroPersistencia(
+      erro instanceof Error
+        ? erro.message
+        : 'Não foi possível salvar o participante neste dispositivo.'
+    );
+  } finally {
+    setSalvando(false);
   }
-
 }
 
   }
@@ -688,7 +727,8 @@ if (!temErro) {
 
               <Pressable
                 style={styles.botaoAdicionarJogo}
-                onPress={adicionarNovoJogo}
+                onPress={() => void adicionarNovoJogo()}
+                disabled={adicionandoJogo}
               >
                 <Text style={styles.textoAdicionarJogo}>
                   + Adicionar "{buscaJogo.trim()}" ao catálogo
@@ -732,12 +772,17 @@ if (!temErro) {
 
           {/* REGISTER BUTTON */}
 
+          {erroPersistencia !== '' && (
+            <Text style={styles.textoErro}>{erroPersistencia}</Text>
+          )}
+
           <Pressable
             style={styles.botao}
-            onPress={validarCadastro}
+            onPress={() => void validarCadastro()}
+            disabled={salvando}
           >
             <Text style={styles.textoBotao}>
-              Cadastrar
+              {salvando ? 'Salvando...' : 'Cadastrar'}
             </Text>
           </Pressable>
 

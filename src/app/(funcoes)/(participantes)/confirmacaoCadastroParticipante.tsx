@@ -1,29 +1,53 @@
-import { buscarUltimoParticipante } from '@/features/armazenamentoParticipantes';
+import { buscarParticipantePorId, type Participante } from '@/features/armazenamentoParticipantes';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 
 export default function ConfirmacaoCadastro() {
+  const db = useSQLiteContext();
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
   const router = useRouter();
-  const params = useLocalSearchParams<{ origem?: string; filaId?: string }>();
-  const participante = buscarUltimoParticipante();
+  const params = useLocalSearchParams<{
+    origem?: string;
+    filaId?: string;
+    participantId?: string;
+  }>();
+
+  const [participante, setParticipante] = useState<Participante | null>(null);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    let ativo = true;
+
+    if (!params.participantId || typeof params.participantId !== 'string') {
+      setParticipante(null);
+      setCarregando(false);
+      return;
+    }
+
+    setCarregando(true);
+    buscarParticipantePorId(db, params.participantId)
+      .then((resultado) => {
+        if (ativo) setParticipante(resultado);
+      })
+      .catch((erro: unknown) => {
+        console.error('Erro ao carregar participante cadastrado:', erro);
+        if (ativo) setParticipante(null);
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [db, params.participantId]);
+
   const veioDaFila = params.origem === 'fila' && Boolean(params.filaId);
-
-  if (!participante) {
-    return (
-      <View style={styles.container}>
-        <Text style={{ color: tema.text }}>Nenhum participante encontrado.</Text>
-        <Pressable style={styles.botao} onPress={() => router.replace('/filas')}>
-          <Text style={styles.textoBotao}>Voltar para filas</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  const [ano, mes, dia] = participante.dataNascimento.split('-');
 
   function voltar() {
     if (veioDaFila && params.filaId) {
@@ -32,6 +56,27 @@ export default function ConfirmacaoCadastro() {
       router.replace('/participantescadastrados');
     }
   }
+
+  if (carregando) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: tema.text }}>Carregando cadastro...</Text>
+      </View>
+    );
+  }
+
+  if (!participante) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: tema.text }}>Não foi possível localizar o participante salvo.</Text>
+        <Pressable style={styles.botao} onPress={voltar}>
+          <Text style={styles.textoBotao}>{veioDaFila ? 'Voltar para filas' : 'Voltar para participantes'}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const [ano, mes, dia] = participante.dataNascimento.split('-');
 
   return (
     <View style={styles.container}>

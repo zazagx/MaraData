@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useSQLiteContext } from 'expo-sqlite';
 import {
   FlatList,
   Modal,
@@ -31,6 +32,7 @@ function obterIniciais(nome: string) {
 }
 
 export default function GerenciarFila() {
+  const db = useSQLiteContext();
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
   const router = useRouter();
@@ -42,13 +44,23 @@ export default function GerenciarFila() {
   const [busca, setBusca] = useState('');
   const [mensagemModal, setMensagemModal] = useState('');
 
-  const atualizarTela = useCallback(() => {
+  const carregarParticipantesCadastrados = useCallback(async () => {
+    const participantes = await buscarParticipantes(db);
+    setParticipantesCadastrados(participantes);
+  }, [db]);
+
+  const atualizarTela = useCallback(async () => {
     if (typeof filaId === 'string') setFila(buscarFilaPorId(filaId));
-    setParticipantesCadastrados(buscarParticipantes());
-  }, [filaId]);
+    try {
+      await carregarParticipantesCadastrados();
+    } catch (erro) {
+      console.error('Erro ao carregar participantes para a fila:', erro);
+      setMensagemModal('Não foi possível carregar os participantes salvos neste dispositivo.');
+    }
+  }, [carregarParticipantesCadastrados, filaId]);
 
   useFocusEffect(useCallback(() => {
-    atualizarTela();
+    void atualizarTela();
   }, [atualizarTela]));
 
   const participantesFiltrados = useMemo(() => {
@@ -85,6 +97,18 @@ export default function GerenciarFila() {
   const participanteAtual = filaAtual.participantes[filaAtual.indiceAtual];
   const proximoParticipante = filaAtual.participantes[filaAtual.indiceAtual + 1];
   const filaAtiva = filaAtual.status === 'ativa';
+
+  async function abrirModalParticipantes() {
+    setMensagemModal('');
+    try {
+      await carregarParticipantesCadastrados();
+      setModalParticipantesVisivel(true);
+    } catch (erro) {
+      console.error('Erro ao atualizar participantes da fila:', erro);
+      setMensagemModal('Não foi possível carregar os participantes.');
+      setModalParticipantesVisivel(true);
+    }
+  }
 
   function selecionarParticipante(participante: Participante) {
     const resultado = adicionarParticipanteAFila(filaAtual.id, {
@@ -173,7 +197,7 @@ export default function GerenciarFila() {
             )}
           </View>
           <View style={styles.divisorCardSenha} />
-          <Pressable style={[styles.botaoAdicionar, !filaAtiva && styles.botaoDesabilitado]} onPress={() => { setMensagemModal(''); setParticipantesCadastrados(buscarParticipantes()); setModalParticipantesVisivel(true); }} disabled={!filaAtiva}>
+          <Pressable style={[styles.botaoAdicionar, !filaAtiva && styles.botaoDesabilitado]} onPress={() => void abrirModalParticipantes()} disabled={!filaAtiva}>
             <Ionicons name="add-circle-outline" size={22} color="#FFFFFF" />
             <Text style={styles.textoBotaoAdicionar}>Adicionar participante</Text>
           </Pressable>

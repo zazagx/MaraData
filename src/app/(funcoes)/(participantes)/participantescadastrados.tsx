@@ -6,6 +6,7 @@ import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
 import {
@@ -53,6 +54,7 @@ function obterIniciais(nome: string) {
 
 
 export default function ParticipantesCadastrados() {
+  const db = useSQLiteContext();
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
 
@@ -60,13 +62,35 @@ export default function ParticipantesCadastrados() {
 
   const [participantes, setParticipantes] = useState<Participante[]>([])
   const [busca, setBusca] = useState('')
+  const [carregando, setCarregando] = useState(true)
+  const [erroCarregamento, setErroCarregamento] = useState('')
 
 
-  // Updates the list whenever this screen becomes active.
+  // Reconsulta o SQLite sempre que a tela volta a ficar ativa.
   useFocusEffect(
     useCallback(() => {
-      setParticipantes(buscarParticipantes())
-    }, [])
+      let ativo = true;
+      setCarregando(true);
+      setErroCarregamento('');
+
+      buscarParticipantes(db)
+        .then((dados) => {
+          if (ativo) setParticipantes(dados);
+        })
+        .catch((erro: unknown) => {
+          console.error('Erro ao consultar participantes:', erro);
+          if (ativo) {
+            setErroCarregamento('Não foi possível carregar os participantes salvos.');
+          }
+        })
+        .finally(() => {
+          if (ativo) setCarregando(false);
+        });
+
+      return () => {
+        ativo = false;
+      };
+    }, [db])
   )
 
 
@@ -115,7 +139,7 @@ export default function ParticipantesCadastrados() {
 
       <FlatList
         data={participantesFiltrados}
-        keyExtractor={(_item, index) => index.toString()}
+        keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.lista}
 
@@ -138,12 +162,14 @@ export default function ParticipantesCadastrados() {
         ListEmptyComponent={
           <View style={styles.listaVazia}>
             <Text style={styles.textoVazio}>
-              {busca
-                ? 'Nenhum participante encontrado.'
-                : 'Nenhum participante cadastrado ainda.'}
+              {carregando
+                ? 'Carregando participantes...'
+                : erroCarregamento || (busca
+                  ? 'Nenhum participante encontrado.'
+                  : 'Nenhum participante cadastrado ainda.')}
             </Text>
 
-            {!busca && (
+            {!carregando && !erroCarregamento && !busca && (
               <Text style={styles.textoAjuda}>
                 Toque no botão + para cadastrar o primeiro participante.
               </Text>

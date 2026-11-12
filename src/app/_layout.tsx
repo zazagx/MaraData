@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Drawer } from "expo-router/drawer";
+import { SQLiteProvider } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 
 import {
@@ -12,6 +13,7 @@ import {
 
 import { EventProvider } from "../context/eventocontexto";
 import { TemaProvider, useTema } from "../context/temaContexto";
+import { migrateDbIfNeeded } from "../database/migrations";
 
 // Componente responsável pela navegação
 function ConteudoLayout() {
@@ -133,11 +135,16 @@ function ConteudoLayout() {
 // Layout principal: disponibiliza os dois contextos
 export default function RootLayout() {
   return (
-    <TemaProvider>
-      <EventProvider>
-        <ConteudoLayout />
-      </EventProvider>
-    </TemaProvider>
+    <SQLiteProvider
+      databaseName="maradata.db"
+      onInit={migrateDbIfNeeded}
+    >
+      <TemaProvider>
+        <EventProvider>
+          <ConteudoLayout />
+        </EventProvider>
+      </TemaProvider>
+    </SQLiteProvider>
   );
 }
 
