@@ -1,7 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Evento, useEvento } from '../../../../context/eventocontexto';
+import { type Evento, useEvento } from '../../../../context/eventocontexto';
 import { useTema } from '../../../../context/temaContexto';
 import { useEstilosTema } from '../../../../context/temaEstilos';
 
@@ -15,16 +16,21 @@ const converterDataParaObjeto = (dataStr: string) => {
 export default function HistoricoIndex() {
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
-  const { evento: eventoAtivo, eventos } = useEvento();
+  const { evento: eventoAtivo, eventos, recarregarEventos } = useEvento();
+
+  useFocusEffect(useCallback(() => {
+    void recarregarEventos().catch((erro) => console.error('Erro ao atualizar histórico de eventos:', erro));
+  }, [recarregarEventos]));
 
   const temEvento = eventoAtivo && eventoAtivo.nomeEvento;
   const emAndamento = temEvento && eventoAtivo.situacao === 'em_andamento';
-  const agendado = temEvento && eventoAtivo.situacao === 'agendado';
 
   // Filtra agendados e ordena da data mais próxima para a mais distante
   const listaAgendados = eventos
     .filter((item: Evento) => item.situacao === 'agendado')
     .sort((a, b) => converterDataParaObjeto(a.dataInicio).getTime() - converterDataParaObjeto(b.dataInicio).getTime());
+
+  const proximoAgendado = listaAgendados[0] ?? null;
 
   // Filtra passados e ordena do mais recente para o mais antigo
   const listaPassados = eventos
@@ -76,7 +82,7 @@ export default function HistoricoIndex() {
 
           <Pressable 
             style={styles.botaoVerDetalhes}
-            onPress={() => router.push('/(funcoes)/eventos/detalhes')}
+            onPress={() => router.push({ pathname: '/(funcoes)/eventos/detalhes', params: { eventId: eventoAtivo.id } })}
           >
             <Text style={styles.textoBotaoDetalhes}>Ver Detalhes</Text>
             <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
@@ -88,7 +94,7 @@ export default function HistoricoIndex() {
           <View style={{ flex: 1 }}>
             <Text style={styles.vazioTitulo}>Nenhum evento em andamento</Text>
             <Text style={styles.vazioSub}>
-              {agendado ? `Próximo: ${eventoAtivo.nomeEvento}` : 'Cadastre ou inicie um evento para exibi-lo aqui.'}
+              {proximoAgendado ? `Próximo: ${proximoAgendado.nomeEvento}` : 'Cadastre ou inicie um evento para exibi-lo aqui.'}
             </Text>
           </View>
         </View>

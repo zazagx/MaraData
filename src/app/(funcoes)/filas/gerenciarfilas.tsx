@@ -38,6 +38,7 @@ export default function GerenciarFila() {
   const router = useRouter();
   const { filaId } = useLocalSearchParams<{ filaId?: string }>();
   const [fila, setFila] = useState<Fila | undefined>();
+  const [carregandoFila, setCarregandoFila] = useState(true);
   const [participantesCadastrados, setParticipantesCadastrados] = useState<Participante[]>([]);
   const [modalParticipantesVisivel, setModalParticipantesVisivel] = useState(false);
   const [modalEncerrarVisivel, setModalEncerrarVisivel] = useState(false);
@@ -50,14 +51,21 @@ export default function GerenciarFila() {
   }, [db]);
 
   const atualizarTela = useCallback(async () => {
-    if (typeof filaId === 'string') setFila(buscarFilaPorId(filaId));
+    setCarregandoFila(true);
     try {
+      if (typeof filaId === 'string') {
+        setFila(await buscarFilaPorId(db, filaId));
+      } else {
+        setFila(undefined);
+      }
       await carregarParticipantesCadastrados();
     } catch (erro) {
-      console.error('Erro ao carregar participantes para a fila:', erro);
-      setMensagemModal('Não foi possível carregar os participantes salvos neste dispositivo.');
+      console.error('Erro ao carregar dados da fila:', erro);
+      setMensagemModal(erro instanceof Error ? erro.message : 'Não foi possível carregar os dados desta fila.');
+    } finally {
+      setCarregandoFila(false);
     }
-  }, [carregarParticipantesCadastrados, filaId]);
+  }, [carregarParticipantesCadastrados, db, filaId]);
 
   useFocusEffect(useCallback(() => {
     void atualizarTela();
@@ -69,6 +77,14 @@ export default function GerenciarFila() {
       participante.nome.toLocaleLowerCase('pt-BR').includes(termo)
     );
   }, [participantesCadastrados, busca]);
+
+  if (carregandoFila) {
+    return (
+      <View style={styles.centralizado}>
+        <Text style={styles.vazioTitulo}>Carregando fila...</Text>
+      </View>
+    );
+  }
 
   if (!fila) {
     return (
@@ -110,34 +126,31 @@ export default function GerenciarFila() {
     }
   }
 
-  function selecionarParticipante(participante: Participante) {
-    const resultado = adicionarParticipanteAFila(filaAtual.id, {
-      nome: participante.nome,
-      dataNascimento: participante.dataNascimento,
-      jogos: participante.jogos,
-    });
+  async function selecionarParticipante(participante: Participante) {
+    const resultado = await adicionarParticipanteAFila(db, filaAtual.id, participante.id);
 
     if (resultado.sucesso && resultado.fila) {
       setFila(resultado.fila);
       setBusca('');
       setModalParticipantesVisivel(false);
     } else {
-      // Aviso dentro da própria janela, sem depender de Alert do sistema.
       setMensagemModal(resultado.mensagem || 'Não foi possível adicionar o participante.');
     }
   }
 
-  function chamarProximaSenha() {
-    const resultado = avancarSenha(filaAtual.id);
+  async function chamarProximaSenha() {
+    const resultado = await avancarSenha(db, filaAtual.id);
     if (resultado.fila) setFila(resultado.fila);
     else setMensagemModal(resultado.mensagem || 'Não foi possível avançar a fila.');
   }
 
-  function confirmarEncerramento() {
-    const resultado = encerrarFilaStorage(filaAtual.id);
+  async function confirmarEncerramento() {
+    const resultado = await encerrarFilaStorage(db, filaAtual.id);
     if (resultado.fila) setFila(resultado.fila);
+    else setMensagemModal(resultado.mensagem || 'Não foi possível encerrar a fila.');
     setModalEncerrarVisivel(false);
   }
+
 
   function abrirCadastroParticipante() {
     setModalParticipantesVisivel(false);

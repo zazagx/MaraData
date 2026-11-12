@@ -31,6 +31,7 @@ export default function Home() {
     router.push({
       pathname: '/(funcoes)/eventos/detalhes',
       params: {
+        eventId: eventoAtivo.id || '',
         nomeEvento: eventoAtivo.nomeEvento,
         localEvento: eventoAtivo.localEvento,
         dataInicio: eventoAtivo.dataInicio,
@@ -53,6 +54,7 @@ export default function Home() {
     router.push({
       pathname: '/(funcoes)/filas',
       params: {
+        eventId: eventoAtivo.id || '',
         nomeEvento: eventoAtivo.nomeEvento,
         localEvento: eventoAtivo.localEvento,
         situacao: eventoAtivo.situacao,

@@ -1,15 +1,18 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useSQLiteContext } from 'expo-sqlite';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 import { salvarFila } from '../../../features/armazenamentofilas';
 
 export default function CriarFila() {
+  const db = useSQLiteContext();
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
   const router = useRouter();
   const params = useLocalSearchParams<{
+    eventId?: string;
     nomeEvento?: string;
     localEvento?: string;
     situacao?: string;
@@ -19,6 +22,8 @@ export default function CriarFila() {
 
   const nomeEvento = params.nomeEvento || '';
   const localEvento = params.localEvento || '';
+  const eventId = typeof params.eventId === 'string' ? params.eventId : '';
+  const [salvando, setSalvando] = useState(false);
 const situacaoEvento = String(params.situacao || '')
   .trim()
   .toLowerCase()
@@ -26,23 +31,31 @@ const situacaoEvento = String(params.situacao || '')
 
 const eventoAtivo =
   situacaoEvento === 'em_andamento' &&
+  eventId.trim() !== '' &&
   nomeEvento.trim() !== '' &&
   localEvento.trim() !== '';
-  function cadastrarFila() {
-    if (!eventoAtivo) return;
+  async function cadastrarFila() {
+    if (!eventoAtivo || salvando) return;
     if (nome.trim() === '') {
       setErroNome('Digite o nome da fila.');
       return;
     }
 
-    const novaFila = salvarFila({
-      nome: nome.trim(),
-      evento: nomeEvento,
-      localEvento,
-    });
-
-    router.replace({ pathname: '/filas/gerenciarfilas', params: { filaId: novaFila.id } });
+    setSalvando(true);
+    setErroNome('');
+    try {
+      const novaFila = await salvarFila(db, {
+        nome: nome.trim(),
+        eventId,
+      });
+      router.replace({ pathname: '/filas/gerenciarfilas', params: { filaId: novaFila.id } });
+    } catch (erro) {
+      setErroNome(erro instanceof Error ? erro.message : 'Não foi possível criar a fila.');
+    } finally {
+      setSalvando(false);
+    }
   }
+
 
   return (
     <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
@@ -71,8 +84,8 @@ const eventoAtivo =
           <Text style={styles.avisoTexto}>A fila será criada como ativa e poderá receber participantes cadastrados.</Text>
         </View>
 
-        <Pressable style={[styles.botao, !eventoAtivo && styles.botaoDesabilitado]} onPress={cadastrarFila} disabled={!eventoAtivo}>
-          <Text style={styles.textoBotao}>Criar fila</Text>
+        <Pressable style={[styles.botao, !eventoAtivo && styles.botaoDesabilitado]} onPress={cadastrarFila} disabled={!eventoAtivo || salvando}>
+          <Text style={styles.textoBotao}>{salvando ? 'Criando...' : 'Criar fila'}</Text>
         </Pressable>
         <Pressable style={styles.botaoCancelar} onPress={() => router.back()}>
           <Text style={styles.textoCancelar}>Cancelar</Text>

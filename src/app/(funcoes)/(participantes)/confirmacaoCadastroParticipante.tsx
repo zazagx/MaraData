@@ -15,6 +15,8 @@ export default function ConfirmacaoCadastro() {
     origem?: string;
     filaId?: string;
     participantId?: string;
+    queueError?: string;
+    eventId?: string;
   }>();
 
   const [participante, setParticipante] = useState<Participante | null>(null);
@@ -52,6 +54,8 @@ export default function ConfirmacaoCadastro() {
   function voltar() {
     if (veioDaFila && params.filaId) {
       router.replace({ pathname: '/filas/gerenciarfilas', params: { filaId: params.filaId } });
+    } else if (typeof params.eventId === 'string' && params.eventId) {
+      router.replace({ pathname: '/participantescadastrados', params: { eventId: params.eventId } });
     } else {
       router.replace('/participantescadastrados');
     }
@@ -84,6 +88,12 @@ export default function ConfirmacaoCadastro() {
       <Text style={styles.titulo}>Participante cadastrado com sucesso!</Text>
       <Text style={styles.descricao}>Confira as informações registradas:</Text>
 
+      {typeof params.queueError === 'string' && params.queueError !== '' && (
+        <View style={styles.avisoFila}>
+          <Text style={styles.avisoFilaTexto}>O participante foi cadastrado, mas houve um problema ao vinculá-lo ao evento/fila: {params.queueError} Ao voltar, você poderá tentar novamente pela lista de participantes.</Text>
+        </View>
+      )}
+
       <View style={styles.card}>
         <Text style={styles.nome}>{participante.nome}</Text>
         <View style={styles.divisor} />
@@ -112,6 +122,8 @@ const estilosBase = StyleSheet.create({
   nome: { fontSize: 19, fontWeight: 'bold', color: '#8000ff' },
   divisor: { height: 1, backgroundColor: '#ddd', marginVertical: 12 },
   informacao: { fontSize: 14, color: '#333', marginBottom: 12 },
+  avisoFila: { width: '100%', maxWidth: 600, padding: 12, borderRadius: 10, backgroundColor: '#FFF4DB', marginBottom: 14 },
+  avisoFilaTexto: { color: '#7A4B00', fontSize: 13, lineHeight: 19 },
   botao: { width: '100%', maxWidth: 600, backgroundColor: '#8000ff', padding: 16, borderRadius: 10, alignItems: 'center' },
   textoBotao: { color: '#fff', fontWeight: 'bold', textAlign: 'center' },
 });

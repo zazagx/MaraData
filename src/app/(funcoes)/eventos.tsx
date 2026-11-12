@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Evento, useEvento } from '../../context/eventocontexto';
+import { type Evento, useEvento } from '../../context/eventocontexto';
 import { useTema } from '../../context/temaContexto';
 import { useEstilosTema } from '../../context/temaEstilos';
 
@@ -89,10 +89,11 @@ function WheelColumn({ label, values, value, onChange }: WheelColumnProps) {
 export default function Eventos() {
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
-  const { setEvento, adicionarEvento, eventos } = useEvento();
+  const { adicionarEvento, eventos, carregandoEventos } = useEvento();
   
   const params = useLocalSearchParams<{
     editando?: string;
+    eventId?: string;
     nomeEvento?: string;
     localEvento?: string;
     dataInicio?: string;
@@ -280,43 +281,43 @@ export default function Eventos() {
     return false;
   };
 
-  const handleCadastrar = () => {
+  const handleCadastrar = async () => {
     const novosErros: { [key: string]: string | boolean } = {};
-    
+
     if (!nomeEvento.trim()) novosErros.nomeEvento = 'Campo obrigatório';
     if (!localEvento.trim()) novosErros.localEvento = 'Campo obrigatório';
-    
+
     if (!dataInicio) novosErros.dataInicio = 'Data obrigatória';
     else if (!validarDataValida(dataInicio)) novosErros.dataInicio = 'Data inválida';
-    
+
     if (!horarioInicio) novosErros.horarioInicio = 'Hora obrigatória';
     else if (!validarHorarioValido(horarioInicio)) novosErros.horarioInicio = 'Hora inválida (00:00 a 23:59)';
 
-    // NOVIDADE: Verifica se já existe um evento idêntico cadastrado na lista
+    const eventId = typeof params.eventId === 'string' ? params.eventId : undefined;
+
     const eventoDuplicado = eventos.some(
-      (item: Evento) => 
-        !estaEditando &&
-        item.nomeEvento.trim().toLowerCase() === nomeEvento.trim().toLowerCase() &&
+      (item: Evento) =>
+        item.id !== eventId &&
+        item.nomeEvento.trim().toLocaleLowerCase('pt-BR') === nomeEvento.trim().toLocaleLowerCase('pt-BR') &&
         item.dataInicio === dataInicio &&
         item.horarioInicio === horarioInicio
     );
 
     if (eventoDuplicado) {
       Alert.alert(
-        'Evento Duplicado', 
+        'Evento duplicado',
         'Já existe um evento cadastrado com este mesmo nome, data e horário de início.'
       );
       return;
     }
 
-    // Validação de conflito de evento em andamento (já existente)
     const jaTemEmAndamento = eventos.some(
-      (item: Evento) => item.situacao === 'em_andamento' && (!estaEditando || item.nomeEvento !== nomeEvento)
+      (item: Evento) => item.situacao === 'em_andamento' && item.id !== eventId
     );
 
-    if (situacao === 'em_andamento' && jaTemEmAndamento && !estaEditando) {
+    if (situacao === 'em_andamento' && jaTemEmAndamento) {
       Alert.alert(
-        'Conflito de Eventos', 
+        'Conflito de eventos',
         'Já existe um evento em andamento no momento. Encerre o evento atual antes de iniciar um novo.'
       );
       return;
@@ -341,8 +342,8 @@ export default function Eventos() {
         const [hIni, mIni] = horarioInicio.split(':').map(Number);
         dInicio.setHours(hIni, mIni, 0, 0);
 
-        const dTermino = dataTermino && !dataTerminoInvalida && validarDataValida(dataTermino) 
-          ? converterParaData(dataTermino) 
+        const dTermino = dataTermino && !dataTerminoInvalida && validarDataValida(dataTermino)
+          ? converterParaData(dataTermino)
           : new Date(dInicio.getTime());
 
         const [hTer, mTer] = horarioTermino.split(':').map(Number);
@@ -360,35 +361,56 @@ export default function Eventos() {
       return;
     }
 
-    const eventoExistente = eventos.find(item => item.nomeEvento === nomeEvento && estaEditando);
+    if (carregandoEventos) {
+      Alert.alert('Aguarde', 'Ainda estamos carregando os eventos salvos neste dispositivo.');
+      return;
+    }
 
-    const eventoCriado: Evento = {
-      id: eventoExistente?.id || Date.now().toString(),
-      nomeEvento,
-      localEvento,
-      dataInicio,
-      dataTermino,
-      horarioInicio,
-      horarioTermino,
-      descricao,
-      situacao,
-    };
+    try {
+      const eventoSalvo = await adicionarEvento({
+        id: eventId,
+        nomeEvento: nomeEvento.trim(),
+        localEvento: localEvento.trim(),
+        dataInicio,
+        dataTermino,
+        horarioInicio,
+        horarioTermino,
+        descricao,
+        situacao,
+      });
 
-    adicionarEvento(eventoCriado);
+      const mensagemSucesso = estaEditando
+        ? 'Evento atualizado com sucesso!'
+        : 'Evento cadastrado com sucesso!';
 
-    const mensagemSucesso = estaEditando ? 'Evento atualizado com sucesso!' : 'Evento cadastrado com sucesso!';
-
-    Alert.alert('Sucesso!', mensagemSucesso, [
-      {
-        text: 'OK',
-        onPress: () => {
-          router.replace({
-            pathname: '/(funcoes)/eventos/detalhes',
-            params: eventoCriado,
-          });
+      Alert.alert('Sucesso!', mensagemSucesso, [
+        {
+          text: 'OK',
+          onPress: () => {
+            router.replace({
+              pathname: '/(funcoes)/eventos/detalhes',
+              params: {
+                eventId: eventoSalvo.id,
+                nomeEvento: eventoSalvo.nomeEvento,
+                localEvento: eventoSalvo.localEvento,
+                dataInicio: eventoSalvo.dataInicio,
+                dataTermino: eventoSalvo.dataTermino,
+                horarioInicio: eventoSalvo.horarioInicio,
+                horarioTermino: eventoSalvo.horarioTermino,
+                descricao: eventoSalvo.descricao,
+                situacao: eventoSalvo.situacao,
+              },
+            });
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (erro) {
+      console.error('Erro ao salvar evento no SQLite:', erro);
+      Alert.alert(
+        'Não foi possível salvar o evento',
+        erro instanceof Error ? erro.message : 'Ocorreu um erro ao salvar os dados localmente.'
+      );
+    }
   };
 
   const irParaHome = () => router.replace('/');

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Evento, useEvento } from '../../../../context/eventocontexto';
+import { type Evento, useEvento } from '../../../../context/eventocontexto';
 import { useTema } from '../../../../context/temaContexto';
 import { useEstilosTema } from '../../../../context/temaEstilos';
 
@@ -14,7 +15,11 @@ const converterDataParaObjeto = (dataStr: string) => {
 export default function AgendadosScreen() {
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
-  const { eventos, setEvento } = useEvento();
+  const { eventos, recarregarEventos } = useEvento();
+
+  useFocusEffect(useCallback(() => {
+    void recarregarEventos().catch((erro) => console.error('Erro ao atualizar eventos agendados:', erro));
+  }, [recarregarEventos]));
 
   // Filtra e ordena por data mais próxima
   const listaAgendados = eventos
@@ -22,11 +27,11 @@ export default function AgendadosScreen() {
     .sort((a, b) => converterDataParaObjeto(a.dataInicio).getTime() - converterDataParaObjeto(b.dataInicio).getTime());
 
   const abrirDetalhesEvento = (item: Evento) => {
-    // Define o evento selecionado no contexto global e navega passando os parâmetros
-    setEvento(item);
+    // O detalhe recupera o evento pelo ID diretamente do contexto/SQLite.
     router.push({
       pathname: '/(funcoes)/eventos/detalhes',
       params: {
+        eventId: item.id,
         nomeEvento: item.nomeEvento,
         localEvento: item.localEvento,
         dataInicio: item.dataInicio,

@@ -18,8 +18,9 @@ import { useEstilosTema } from '../../../context/temaEstilos';
 export default function DetalhesEvento() {
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
-  const { evento: eventoContexto, setEvento } = useEvento();
+  const { evento: eventoSelecionado, eventos, encerrarEvento } = useEvento();
   const params = useLocalSearchParams<{
+    eventId?: string;
     nomeEvento?: string;
     localEvento?: string;
     dataInicio?: string;
@@ -30,7 +31,12 @@ export default function DetalhesEvento() {
     situacao?: 'agendado' | 'em_andamento' | 'encerrado';
   }>();
 
-  // Dá prioridade absoluta ao contexto global atualizado, depois aos parâmetros e por fim aos padrões[cite: 6]
+  const eventId = typeof params.eventId === 'string' ? params.eventId : undefined;
+  const eventoContexto = eventId
+    ? eventos.find((item) => item.id === eventId) ?? (eventoSelecionado?.id === eventId ? eventoSelecionado : null)
+    : eventoSelecionado;
+
+  // Prioriza o registro persistido; os parâmetros servem como fallback de navegação.
   const nomeEvento = eventoContexto?.nomeEvento || params.nomeEvento || 'Evento';
   const localEvento = eventoContexto?.localEvento || params.localEvento || 'Local não informado';
   const dataInicio = eventoContexto?.dataInicio || params.dataInicio || 'Não informada';
@@ -51,27 +57,25 @@ export default function DetalhesEvento() {
       ? 'ENCERRADO'
       : 'AGENDADO';
 
-  const handleEncerrarEvento = () => {
+  const handleEncerrarEvento = async () => {
     setModalEncerrarVisivel(false);
-    if (eventoContexto) {
-      // Limpa os dados do evento ou define como nulo no contexto global[cite: 6]
-      setEvento({
-        nomeEvento: '',
-        localEvento: '',
-        dataInicio: '',
-        dataTermino: '',
-        horarioInicio: '',
-        horarioTermino: '',
-        descricao: '',
-        situacao: 'encerrado',
-      });
+
+    if (!eventId) {
+      Alert.alert('Evento não identificado', 'Não foi possível localizar o identificador deste evento.');
+      return;
     }
-    Alert.alert('Evento Encerrado', 'O evento foi finalizado com sucesso.', [
-      {
-        text: 'OK',
-        onPress: () => router.replace('/'), // Volta para a Home já limpa[cite: 6]
-      },
-    ]);
+
+    try {
+      await encerrarEvento(eventId);
+      Alert.alert('Evento encerrado', 'O evento foi finalizado e salvo neste dispositivo.', [
+        { text: 'OK', onPress: () => router.replace('/') },
+      ]);
+    } catch (erro) {
+      Alert.alert(
+        'Não foi possível encerrar o evento',
+        erro instanceof Error ? erro.message : 'Ocorreu um erro ao atualizar o evento.'
+      );
+    }
   };
 
   // Função para abrir a tela de cadastro enviando os dados atuais para edição[cite: 6]
@@ -80,6 +84,7 @@ export default function DetalhesEvento() {
       pathname: '/(funcoes)/eventos',
       params: {
         editando: 'true',
+        eventId: eventId || '',
         nomeEvento,
         localEvento,
         dataInicio,
@@ -94,11 +99,11 @@ export default function DetalhesEvento() {
 
   const acessarNavegacao = (tela: string) => {
     if (tela === 'participantes') {
-      router.push('/(funcoes)/(participantes)/participantescadastrados');
+      router.push({ pathname: '/(funcoes)/(participantes)/participantescadastrados', params: { eventId: eventId || '', situacao } });
     } else if (tela === 'filas') {
       router.push({
         pathname: '/(funcoes)/filas',
-        params: { nomeEvento, localEvento, situacao },
+        params: { eventId: eventId || '', nomeEvento, localEvento, situacao },
       });
     } else if (tela === 'estatisticas') {
       router.push('/(funcoes)/estatistica');
@@ -118,7 +123,7 @@ export default function DetalhesEvento() {
               style={{ marginLeft: 4, marginRight: 12 }}
               accessibilityLabel="Voltar para Home"
             >
-              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+              <Ionicons name="arrow-back" size={24} color={tema.text} />
             </TouchableOpacity>
           ),
         }}
@@ -238,23 +243,29 @@ export default function DetalhesEvento() {
           <Text style={[styles.cardSectionTitle, { marginTop: 24 }]}>Ações administrativas</Text>
           
           <View style={styles.adminButtonsRow}>
-            <TouchableOpacity style={styles.btnEditar} onPress={irParaEdicao}>
-              <Ionicons name="pencil-outline" size={16} color={tema.primary} />
-              <Text style={styles.btnEditarText}>Editar evento</Text>
-            </TouchableOpacity>
+            {situacao !== 'encerrado' && (
+              <TouchableOpacity style={styles.btnEditar} onPress={irParaEdicao}>
+                <Ionicons name="pencil-outline" size={16} color={tema.primary} />
+                <Text style={styles.btnEditarText}>Editar evento</Text>
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity style={styles.btnEncerrar} onPress={() => setModalEncerrarVisivel(true)}>
-              <Ionicons name="power-outline" size={16} color="#DC2626" />
-              <Text style={styles.btnEncerrarText}>Encerrar evento</Text>
-            </TouchableOpacity>
+            {situacao === 'em_andamento' && (
+              <TouchableOpacity style={styles.btnEncerrar} onPress={() => setModalEncerrarVisivel(true)}>
+                <Ionicons name="power-outline" size={16} color="#DC2626" />
+                <Text style={styles.btnEncerrarText}>Encerrar evento</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.warningNote}>
             <Ionicons name="information-circle-outline" size={16} color={tema.textSecondary} />
             <Text style={styles.warningNoteText}>
-              {situacao === 'agendado' 
-                ? 'O evento só pode ser encerrado quando estiver em andamento.' 
-                : 'Gerencie as sessões com atenção ao encerrar.'}
+              {situacao === 'agendado'
+                ? 'O evento ainda não foi iniciado. Você pode ajustar seus dados antes de começar.'
+                : situacao === 'encerrado'
+                  ? 'Este evento foi encerrado. Os dados históricos permanecem disponíveis para consulta.'
+                  : 'Ao encerrar o evento, todas as filas abertas também serão encerradas.'}
             </Text>
           </View>
 
@@ -303,15 +314,19 @@ export default function DetalhesEvento() {
       <Modal visible={modalMenuVisivel} transparent animationType="slide" onRequestClose={() => setModalMenuVisivel(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalMenuVisivel(false)}>
           <View style={styles.bottomSheetCard}>
-            <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); irParaEdicao(); }}>
-              <Ionicons name="pencil-outline" size={20} color={tema.primary} />
-              <Text style={styles.sheetOptionText}>Editar evento</Text>
-            </TouchableOpacity>
+            {situacao !== 'encerrado' && (
+              <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); irParaEdicao(); }}>
+                <Ionicons name="pencil-outline" size={20} color={tema.primary} />
+                <Text style={styles.sheetOptionText}>Editar evento</Text>
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); setModalEncerrarVisivel(true); }}>
-              <Ionicons name="power-outline" size={20} color="#DC2626" />
-              <Text style={[styles.sheetOptionText, { color: '#DC2626' }]}>Encerrar evento</Text>
-            </TouchableOpacity>
+            {situacao === 'em_andamento' && (
+              <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); setModalEncerrarVisivel(true); }}>
+                <Ionicons name="power-outline" size={20} color="#DC2626" />
+                <Text style={[styles.sheetOptionText, { color: '#DC2626' }]}>Encerrar evento</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={[styles.sheetOption, { borderBottomWidth: 0 }]} onPress={() => setModalMenuVisivel(false)}>
               <Ionicons name="close-outline" size={20} color="#EF4444" />

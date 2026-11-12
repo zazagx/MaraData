@@ -11,7 +11,8 @@ import { useEstilosTema } from '../../../context/temaEstilos';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
-import { adicionarParticipanteAFila } from '@/features/armazenamentofilas';
+import { adicionarParticipanteAFila } from '../../../features/armazenamentofilas';
+import { registrarParticipanteNoEvento } from '../../../features/armazenamentoEvento';
 import { useLocalSearchParams } from 'expo-router';
 import {
   Modal,
@@ -229,7 +230,7 @@ export default function novoparticipante() {
   const styles = useEstilosTema(estilosBase);
 
   const router = useRouter()
-  const params = useLocalSearchParams<{ origem?: string; filaId?: string }>()
+  const params = useLocalSearchParams<{ origem?: string; filaId?: string; eventId?: string }>()
 
   const [participante, setParticipante] = useState<DadosParticipante>({
     nome: '',
@@ -301,7 +302,7 @@ export default function novoparticipante() {
     setParticipante((anterior) => ({
       ...anterior,
       [campo]: valor
-    }) as Participante)
+    }) as DadosParticipante)
 
     setErros((anterior) => ({
       ...anterior,
@@ -520,14 +521,27 @@ if (!temErro && !salvando) {
   try {
     const participanteCriado = await salvarParticipante(db, participanteSalvo);
 
-    // Se o cadastro começou pela tela de filas, preserva o fluxo atual.
-    // A persistência das filas será migrada na próxima etapa.
-    if (params.origem === 'fila' && params.filaId) {
-      adicionarParticipanteAFila(params.filaId, {
-        nome: participanteCriado.nome,
-        dataNascimento: participanteCriado.dataNascimento,
-        jogos: participanteCriado.jogos,
-      });
+    let erroAoAdicionarNaFila = '';
+
+    // Se o cadastro começou pelo gerenciamento de uma fila, cria também
+    // o vínculo do participante com o evento e com a fila no SQLite.
+    if (params.origem === 'fila' && typeof params.filaId === 'string') {
+      const resultadoFila = await adicionarParticipanteAFila(
+        db,
+        params.filaId,
+        participanteCriado.id
+      );
+      if (!resultadoFila.sucesso) {
+        erroAoAdicionarNaFila = resultadoFila.mensagem || 'O participante foi salvo, mas não entrou na fila.';
+      }
+    } else if (typeof params.eventId === 'string' && params.eventId) {
+      try {
+        await registrarParticipanteNoEvento(db, params.eventId, participanteCriado.id);
+      } catch (erroVinculo) {
+        erroAoAdicionarNaFila = erroVinculo instanceof Error
+          ? `O participante foi salvo, mas não foi vinculado ao evento: ${erroVinculo.message}`
+          : 'O participante foi salvo, mas não foi vinculado ao evento.';
+      }
     }
 
     router.replace({
@@ -536,6 +550,8 @@ if (!temErro && !salvando) {
         participantId: participanteCriado.id,
         ...(params.origem === 'fila' ? { origem: 'fila' } : {}),
         ...(typeof params.filaId === 'string' ? { filaId: params.filaId } : {}),
+        ...(typeof params.eventId === 'string' ? { eventId: params.eventId } : {}),
+        ...(erroAoAdicionarNaFila ? { queueError: erroAoAdicionarNaFila } : {}),
       },
     });
   } catch (erro) {

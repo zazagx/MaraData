@@ -4,12 +4,17 @@ import {
 } from '@/features/armazenamentoParticipantes';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
+import {
+  buscarParticipantesDoEvento,
+  registrarParticipanteNoEvento,
+} from '../../../features/armazenamentoEvento';
 
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
 import {
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -59,29 +64,49 @@ export default function ParticipantesCadastrados() {
   const styles = useEstilosTema(estilosBase);
 
   const router = useRouter()
+  const params = useLocalSearchParams<{ eventId?: string; situacao?: string }>();
+  const eventId = typeof params.eventId === 'string' ? params.eventId : '';
+  const eventoEncerrado = Boolean(eventId && params.situacao === 'encerrado');
 
   const [participantes, setParticipantes] = useState<Participante[]>([])
+  const [todosParticipantes, setTodosParticipantes] = useState<Participante[]>([])
   const [busca, setBusca] = useState('')
+  const [buscaVincular, setBuscaVincular] = useState('')
+  const [modalVincularVisivel, setModalVincularVisivel] = useState(false)
   const [carregando, setCarregando] = useState(true)
   const [erroCarregamento, setErroCarregamento] = useState('')
+  const [participantesNoEvento, setParticipantesNoEvento] = useState<Set<string>>(new Set());
 
 
   // Reconsulta o SQLite sempre que a tela volta a ficar ativa.
+  // Quando há eventId, a lista principal contém somente participantes inscritos
+  // naquele evento. A lista global é mantida separadamente para permitir novos vínculos.
   useFocusEffect(
     useCallback(() => {
       let ativo = true;
       setCarregando(true);
       setErroCarregamento('');
 
-      buscarParticipantes(db)
-        .then((dados) => {
-          if (ativo) setParticipantes(dados);
+      Promise.all([
+        eventId
+          ? buscarParticipantesDoEvento(db, eventId)
+          : buscarParticipantes(db),
+        eventId
+          ? buscarParticipantes(db)
+          : Promise.resolve([] as Participante[]),
+      ])
+        .then(([dadosVisiveis, todos]) => {
+          if (ativo) {
+            setParticipantes(dadosVisiveis);
+            setTodosParticipantes(todos);
+            setParticipantesNoEvento(
+              new Set(eventId ? dadosVisiveis.map((item) => item.id) : [])
+            );
+          }
         })
         .catch((erro: unknown) => {
           console.error('Erro ao consultar participantes:', erro);
-          if (ativo) {
-            setErroCarregamento('Não foi possível carregar os participantes salvos.');
-          }
+          if (ativo) setErroCarregamento('Não foi possível carregar os participantes salvos.');
         })
         .finally(() => {
           if (ativo) setCarregando(false);
@@ -90,7 +115,7 @@ export default function ParticipantesCadastrados() {
       return () => {
         ativo = false;
       };
-    }, [db])
+    }, [db, eventId])
   )
 
 
@@ -101,10 +126,54 @@ export default function ParticipantesCadastrados() {
       .includes(busca.trim().toLocaleLowerCase('pt-BR'))
   )
 
+  // Na tela de um evento, permite localizar pessoas do cadastro geral que
+  // ainda não foram vinculadas a ele, sem misturá-las à lista de participantes.
+  const participantesDisponiveis = todosParticipantes.filter(
+    (participante) => !participantesNoEvento.has(participante.id)
+  );
+
+  const participantesDisponiveisFiltrados = participantesDisponiveis.filter(
+    (participante) =>
+      participante.nome
+        .toLocaleLowerCase('pt-BR')
+        .includes(buscaVincular.trim().toLocaleLowerCase('pt-BR'))
+  );
+
   //Setinha de detalhes do respectivo participante ああああ
   const [participanteSelecionado, setParticipanteSelecionado] =
   useState<Participante | null>(null)
 
+  async function adicionarParticipanteSelecionadoAoEvento() {
+    if (!eventId || !participanteSelecionado) return;
+
+    try {
+      const resultado = await registrarParticipanteNoEvento(
+        db,
+        eventId,
+        participanteSelecionado.id
+      );
+
+      const inscritosAtualizados = await buscarParticipantesDoEvento(db, eventId);
+      setParticipantes(inscritosAtualizados);
+      setParticipantesNoEvento(
+        new Set(inscritosAtualizados.map((item) => item.id))
+      );
+      setModalVincularVisivel(false);
+      setParticipanteSelecionado(null);
+
+      Alert.alert(
+        resultado.jaExistia ? 'Participante já vinculado' : 'Participante adicionado',
+        resultado.jaExistia
+          ? 'Este participante já está registrado neste evento.'
+          : 'O participante foi vinculado ao evento. Os dados desta inscrição foram registrados para as estatísticas.'
+      );
+    } catch (erro) {
+      Alert.alert(
+        'Não foi possível vincular',
+        erro instanceof Error ? erro.message : 'Ocorreu um erro ao vincular o participante ao evento.'
+      );
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -124,12 +193,14 @@ export default function ParticipantesCadastrados() {
           headerTitleAlign: 'center',
 
           headerRight: () => (
-            <Pressable
-              style={styles.botaoAdicionar}
-              onPress={() => router.push('/novoparticipante')}
-            >
-              <Text style={styles.iconeMais}>+</Text>
-            </Pressable>
+            !eventoEncerrado ? (
+              <Pressable
+                style={styles.botaoAdicionar}
+                onPress={() => router.push(eventId ? { pathname: '/novoparticipante', params: { eventId } } : '/novoparticipante')}
+              >
+                <Text style={styles.iconeMais}>+</Text>
+              </Pressable>
+            ) : null
           ),
         }}
       />
@@ -144,18 +215,31 @@ export default function ParticipantesCadastrados() {
         contentContainerStyle={styles.lista}
 
         ListHeaderComponent={
-          <View style={styles.buscaContainer}>
+          <View>
+            <View style={styles.buscaContainer}>
+              <Text style={styles.iconeBusca}>⌕</Text>
+              <TextInput
+                style={styles.campoBusca}
+                placeholder="Buscar participante..."
+                placeholderTextColor={tema.textSecondary}
+                value={busca}
+                onChangeText={setBusca}
+              />
+            </View>
 
-            <Text style={styles.iconeBusca}>⌕</Text>
-
-            <TextInput
-              style={styles.campoBusca}
-              placeholder="Buscar participante..."
-              placeholderTextColor={tema.textSecondary}
-              value={busca}
-              onChangeText={setBusca}
-            />
-
+            {eventId && !eventoEncerrado && (
+              <Pressable
+                style={styles.botaoVincularExistente}
+                onPress={() => {
+                  setBuscaVincular('');
+                  setModalVincularVisivel(true);
+                }}
+              >
+                <Text style={styles.textoBotaoVincularExistente}>
+                  + Vincular participante já cadastrado
+                </Text>
+              </Pressable>
+            )}
           </View>
         }
 
@@ -166,12 +250,18 @@ export default function ParticipantesCadastrados() {
                 ? 'Carregando participantes...'
                 : erroCarregamento || (busca
                   ? 'Nenhum participante encontrado.'
-                  : 'Nenhum participante cadastrado ainda.')}
+                  : eventId
+                    ? 'Nenhum participante vinculado a este evento ainda.'
+                    : 'Nenhum participante cadastrado ainda.')}
             </Text>
 
             {!carregando && !erroCarregamento && !busca && (
               <Text style={styles.textoAjuda}>
-                Toque no botão + para cadastrar o primeiro participante.
+                {eventId
+                  ? eventoEncerrado
+                    ? 'Este evento foi encerrado; a lista está disponível somente para consulta.'
+                    : 'Use as opções acima para cadastrar uma pessoa nova ou vincular alguém já cadastrado.'
+                  : 'Toque no botão + para cadastrar o primeiro participante.'}
               </Text>
             )}
           </View>
@@ -313,9 +403,96 @@ export default function ParticipantesCadastrados() {
         </ScrollView>
       )}
 
+      {eventId && participanteSelecionado && (
+        <View style={styles.acoesModal}>
+          {participantesNoEvento.has(participanteSelecionado.id) ? (
+            <Text style={styles.participanteVinculado}>Este participante já está vinculado a este evento.</Text>
+          ) : (
+            <Pressable style={styles.botaoAdicionarEvento} onPress={adicionarParticipanteSelecionadoAoEvento}>
+              <Text style={styles.textoBotaoAdicionarEvento}>Adicionar participante a este evento</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </View>
   </View>
 </Modal>
+
+      {/* Modal separado: procura no cadastro global sem poluir a lista do evento. */}
+      <Modal
+        visible={modalVincularVisivel}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVincularVisivel(false)}
+      >
+        <View style={styles.fundoModal}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setModalVincularVisivel(false)}
+          />
+          <View style={styles.modalVincularCard}>
+            <View style={styles.modalCabecalho}>
+              <View style={styles.identificacaoModal}>
+                <Text style={styles.nomeModal}>Vincular participante</Text>
+                <Text style={styles.subtitulo}>
+                  Escolha alguém já cadastrado que ainda não participa deste evento.
+                </Text>
+              </View>
+              <Pressable
+                style={styles.botaoFechar}
+                onPress={() => setModalVincularVisivel(false)}
+              >
+                <Text style={styles.textoFechar}>×</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.buscaContainer}>
+              <Text style={styles.iconeBusca}>⌕</Text>
+              <TextInput
+                style={styles.campoBusca}
+                placeholder="Buscar participante..."
+                placeholderTextColor={tema.textSecondary}
+                value={buscaVincular}
+                onChangeText={setBuscaVincular}
+              />
+            </View>
+
+            <FlatList
+              data={participantesDisponiveisFiltrados}
+              keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
+              style={styles.listaVincular}
+              ListEmptyComponent={
+                <Text style={styles.textoVazioVincular}>
+                  {participantesDisponiveis.length === 0
+                    ? 'Todos os participantes cadastrados já estão vinculados a este evento.'
+                    : 'Nenhum participante encontrado.'}
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.itemModal}
+                  onPress={() => {
+                    setParticipanteSelecionado(item);
+                    setModalVincularVisivel(false);
+                  }}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.iniciais}>{obterIniciais(item.nome)}</Text>
+                  </View>
+                  <View style={styles.identificacaoModal}>
+                    <Text style={styles.nomeItemModal}>{item.nome}</Text>
+                    <Text style={styles.jogosItemModal}>
+                      {item.jogos.join(', ') || 'Sem jogos informados'}
+                    </Text>
+                  </View>
+                  <Text style={styles.iconeAdicionarVinculo}>+</Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
     </View>
   )
@@ -323,6 +500,67 @@ export default function ParticipantesCadastrados() {
 
 
 const estilosBase = StyleSheet.create({
+  botaoVincularExistente: {
+    backgroundColor: '#EEE5FF',
+    borderRadius: 11,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginTop: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  textoBotaoVincularExistente: {
+    color: '#6500CC',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  modalVincularCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '82%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 18,
+    overflow: 'hidden',
+  },
+  listaVincular: {
+    flexGrow: 0,
+    minHeight: 100,
+    maxHeight: 380,
+  },
+  textoVazioVincular: {
+    color: '#777777',
+    fontSize: 13,
+    textAlign: 'center',
+    padding: 22,
+  },
+  iconeAdicionarVinculo: {
+    color: '#8000FF',
+    fontSize: 25,
+    fontWeight: 'bold',
+    paddingHorizontal: 5,
+  },
+
+  acoesModal: {
+    paddingTop: 12,
+  },
+  botaoAdicionarEvento: {
+    backgroundColor: '#8000ff',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  textoBotaoAdicionarEvento: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  participanteVinculado: {
+    color: '#23865A',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    padding: 10,
+  },
 
   container: {
     flex: 1,

@@ -1,49 +1,61 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useSQLiteContext } from 'expo-sqlite';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 import { buscarFilas, type Fila } from '../../../features/armazenamentofilas';
 
 export default function ListaFilas() {
+  const db = useSQLiteContext();
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
   const router = useRouter();
   const params = useLocalSearchParams<{
+    eventId?: string;
     nomeEvento?: string;
     localEvento?: string;
     situacao?: string;
   }>();
   const [filas, setFilas] = useState<Fila[]>([]);
+  const [erroCarregamento, setErroCarregamento] = useState('');
 
+const eventId = typeof params.eventId === 'string' ? params.eventId : '';
 const situacaoEvento = String(params.situacao || '')
   .trim()
   .toLowerCase()
   .replace(/\s+/g, '_');
 
 const eventoDisponivel = Boolean(
-  params.nomeEvento?.trim() &&
-  params.localEvento?.trim() &&
-  situacaoEvento === 'em_andamento'
-);  const filasExibidas = params.nomeEvento
-    ? filas.filter((fila) => fila.evento === params.nomeEvento)
-    : filas;
+  eventId && params.nomeEvento?.trim() && situacaoEvento === 'em_andamento'
+);
+const filasExibidas = eventId ? filas.filter((fila) => fila.eventId === eventId) : filas;
 
   useFocusEffect(useCallback(() => {
-    setFilas(buscarFilas());
-  }, []));
+    let ativo = true;
+    setErroCarregamento('');
+    buscarFilas(db, eventId || undefined)
+      .then((lista) => { if (ativo) setFilas(lista); })
+      .catch((erro: unknown) => {
+        console.error('Erro ao carregar filas do SQLite:', erro);
+        if (ativo) setErroCarregamento('Não foi possível carregar as filas salvas neste dispositivo.');
+      });
+    return () => { ativo = false; };
+  }, [db, eventId]));
 
-function abrirCriacao() {
-  router.push({
-    pathname: '/filas/criarfilas',
-    params: {
-      nomeEvento: params.nomeEvento || '',
-      localEvento: params.localEvento || '',
-      situacao: situacaoEvento,
-    },
-  });
-}
+  function abrirCriacao() {
+    if (!eventoDisponivel) return;
+    router.push({
+      pathname: '/filas/criarfilas',
+      params: {
+        eventId,
+        nomeEvento: params.nomeEvento || '',
+        localEvento: params.localEvento || '',
+        situacao: situacaoEvento,
+      },
+    });
+  }
 
   return (
     <View style={styles.container}>
@@ -86,8 +98,8 @@ function abrirCriacao() {
         )}
         ListEmptyComponent={(
           <View style={styles.listaVazia}>
-            <Text style={styles.textoVazio}>Nenhuma fila criada para este evento.</Text>
-            <Text style={styles.textoAjuda}>{eventoDisponivel ? 'Toque no botão + para criar a primeira fila.' : 'Selecione um evento em andamento para começar.'}</Text>
+            <Text style={styles.textoVazio}>{erroCarregamento || 'Nenhuma fila criada para este evento.'}</Text>
+            <Text style={styles.textoAjuda}>{erroCarregamento ? 'Confira o banco local e tente novamente.' : eventoDisponivel ? 'Toque no botão + para criar a primeira fila.' : 'Selecione um evento em andamento para começar.'}</Text>
           </View>
         )}
         renderItem={({ item }) => (

@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEvento } from '../../../../context/eventocontexto';
 import { useTema } from '../../../../context/temaContexto';
@@ -8,7 +9,11 @@ import { useEstilosTema } from '../../../../context/temaEstilos';
 export default function PassadosScreen() {
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
-  const { eventos } = useEvento();
+  const { eventos, recarregarEventos } = useEvento();
+
+  useFocusEffect(useCallback(() => {
+    void recarregarEventos().catch((erro) => console.error('Erro ao atualizar eventos passados:', erro));
+  }, [recarregarEventos]));
 
   // Filtra apenas os eventos que estão com a situação 'encerrado' (ou passados)
   const listaPassados = eventos.filter((item) => item.situacao === 'encerrado');
@@ -30,7 +35,11 @@ export default function PassadosScreen() {
       {/* LISTA DINÂMICA DE PASSADOS */}
       {listaPassados.length > 0 ? (
         listaPassados.map((item, index) => (
-          <View key={item.id || index} style={styles.cardItemLista}>
+          <Pressable
+            key={item.id || index}
+            style={styles.cardItemLista}
+            onPress={() => router.push({ pathname: '/(funcoes)/eventos/detalhes', params: { eventId: item.id } })}
+          >
             <View style={styles.iconeMiniContainerPassado}>
               <MaterialCommunityIcons name="trophy-outline" size={24} color="#FFFFFF" />
             </View>
@@ -42,7 +51,7 @@ export default function PassadosScreen() {
             <View style={styles.badgeStatusFinalizado}>
               <Text style={styles.textoStatusFinalizado}>Finalizado</Text>
             </View>
-          </View>
+          </Pressable>
         ))
       ) : (
         <View style={styles.vazioContainer}>
