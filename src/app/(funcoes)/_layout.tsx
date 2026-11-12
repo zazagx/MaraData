@@ -60,6 +60,13 @@ export default function FuncoesLayout() {
         }}
       />
 
+      <Stack.Screen
+        name="eventos/historico/index"
+        options={{
+          title: "Histórico de Eventos",
+        }}
+      />
+
     </Stack>
 
   );
