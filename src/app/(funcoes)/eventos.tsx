@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useEvento } from '../../context/eventocontexto';
+import { Evento, useEvento } from '../../context/eventocontexto';
 
 type CampoDataOuHora = 'dataInicio' | 'dataTermino' | 'horarioInicio' | 'horarioTermino';
 type WheelColumnProps = {
@@ -84,21 +84,31 @@ function WheelColumn({ label, values, value, onChange }: WheelColumnProps) {
 }
 
 export default function Eventos() {
-  const { evento: eventoContexto, setEvento } = useEvento();
+  const { setEvento, adicionarEvento, eventos } = useEvento();
   
   const params = useLocalSearchParams<{
     editando?: string;
+    nomeEvento?: string;
+    localEvento?: string;
+    dataInicio?: string;
+    dataTermino?: string;
+    horarioInicio?: string;
+    horarioTermino?: string;
+    descricao?: string;
+    situacao?: 'agendado' | 'em_andamento';
   }>();
 
-  const [nomeEvento, setNomeEvento] = useState(eventoContexto?.nomeEvento || '');
-  const [localEvento, setLocalEvento] = useState(eventoContexto?.localEvento || '');
-  const [dataInicio, setDataInicio] = useState(eventoContexto?.dataInicio || '');
-  const [dataTermino, setDataTermino] = useState(eventoContexto?.dataTermino || '');
-  const [horarioInicio, setHorarioInicio] = useState(eventoContexto?.horarioInicio || '');
-  const [horarioTermino, setHorarioTermino] = useState(eventoContexto?.horarioTermino || '');
-  const [descricao, setDescricao] = useState(eventoContexto?.descricao || '');
+  const estaEditando = params.editando === 'true';
+
+  const [nomeEvento, setNomeEvento] = useState(estaEditando ? params.nomeEvento || '' : '');
+  const [localEvento, setLocalEvento] = useState(estaEditando ? params.localEvento || '' : '');
+  const [dataInicio, setDataInicio] = useState(estaEditando ? params.dataInicio || '' : '');
+  const [dataTermino, setDataTermino] = useState(estaEditando ? params.dataTermino || '' : '');
+  const [horarioInicio, setHorarioInicio] = useState(estaEditando ? params.horarioInicio || '' : '');
+  const [horarioTermino, setHorarioTermino] = useState(estaEditando ? params.horarioTermino || '' : '');
+  const [descricao, setDescricao] = useState(estaEditando ? params.descricao || '' : '');
   const [situacao, setSituacao] = useState<'agendado' | 'em_andamento'>(
-    eventoContexto?.situacao === 'em_andamento' ? 'em_andamento' : 'agendado'
+    estaEditando && params.situacao === 'em_andamento' ? 'em_andamento' : 'agendado'
   );
 
   const [erros, setErros] = useState<{ [key: string]: string | boolean }>({});
@@ -115,21 +125,6 @@ export default function Eventos() {
   
   const [tempHora, setTempHora] = useState(0);
   const [tempMinuto, setTempMinuto] = useState(0);
-
-  useEffect(() => {
-    if (params.editando === 'true' && eventoContexto) {
-      if (eventoContexto.nomeEvento) setNomeEvento(eventoContexto.nomeEvento);
-      if (eventoContexto.localEvento) setLocalEvento(eventoContexto.localEvento);
-      if (eventoContexto.dataInicio) setDataInicio(eventoContexto.dataInicio);
-      if (eventoContexto.dataTermino) setDataTermino(eventoContexto.dataTermino);
-      if (eventoContexto.horarioInicio) setHorarioInicio(eventoContexto.horarioInicio);
-      if (eventoContexto.horarioTermino) setHorarioTermino(eventoContexto.horarioTermino);
-      if (eventoContexto.descricao) setDescricao(eventoContexto.descricao);
-      if (eventoContexto.situacao && eventoContexto.situacao !== 'encerrado') {
-        setSituacao(eventoContexto.situacao as 'agendado' | 'em_andamento');
-      }
-    }
-  }, [params.editando, eventoContexto]);
 
   const validarDataValida = (dataStr: string) => {
     if (!dataStr || dataStr.length < 10) return false;
@@ -292,21 +287,34 @@ export default function Eventos() {
     if (!horarioInicio) novosErros.horarioInicio = 'Hora obrigatória';
     else if (!validarHorarioValido(horarioInicio)) novosErros.horarioInicio = 'Hora inválida (00:00 a 23:59)';
 
-    // TRAVA DE SEGURANÇA: Se for modo agendado e a data for hoje, o horário não pode ser no passado
-    if (!novosErros.dataInicio && !novosErros.horarioInicio && situacao === 'agendado') {
-      const dInicio = converterParaData(dataInicio);
-      const dataHojeZerada = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-      
-      if (dInicio.getTime() === dataHojeZerada.getTime()) {
-        const [hIni, mIni] = horarioInicio.split(':').map(Number);
-        const agora = new Date();
-        const horaAtualMinutos = agora.getHours() * 60 + agora.getMinutes();
-        const horarioEscolhidoMinutos = hIni * 60 + mIni;
+    // NOVIDADE: Verifica se já existe um evento idêntico cadastrado na lista
+    const eventoDuplicado = eventos.some(
+      (item: Evento) => 
+        !estaEditando &&
+        item.nomeEvento.trim().toLowerCase() === nomeEvento.trim().toLowerCase() &&
+        item.dataInicio === dataInicio &&
+        item.horarioInicio === horarioInicio
+    );
 
-        if (horarioEscolhidoMinutos <= horaAtualMinutos) {
-          novosErros.horarioInicio = 'Para hoje, o horário deve ser futuro. Use "Iniciar Agora" se o evento já começou.';
-        }
-      }
+    if (eventoDuplicado) {
+      Alert.alert(
+        'Evento Duplicado', 
+        'Já existe um evento cadastrado com este mesmo nome, data e horário de início.'
+      );
+      return;
+    }
+
+    // Validação de conflito de evento em andamento (já existente)
+    const jaTemEmAndamento = eventos.some(
+      (item: Evento) => item.situacao === 'em_andamento' && (!estaEditando || item.nomeEvento !== nomeEvento)
+    );
+
+    if (situacao === 'em_andamento' && jaTemEmAndamento && !estaEditando) {
+      Alert.alert(
+        'Conflito de Eventos', 
+        'Já existe um evento em andamento no momento. Encerre o evento atual antes de iniciar um novo.'
+      );
+      return;
     }
 
     let dataTerminoInvalida = false;
@@ -347,7 +355,10 @@ export default function Eventos() {
       return;
     }
 
-    setEvento({
+    const eventoExistente = eventos.find(item => item.nomeEvento === nomeEvento && estaEditando);
+
+    const eventoCriado: Evento = {
+      id: eventoExistente?.id || Date.now().toString(),
       nomeEvento,
       localEvento,
       dataInicio,
@@ -356,15 +367,20 @@ export default function Eventos() {
       horarioTermino,
       descricao,
       situacao,
-    });
+    };
 
-    const mensagemSucesso = params.editando === 'true' ? 'Evento atualizado com sucesso!' : 'Evento cadastrado com sucesso!';
+    adicionarEvento(eventoCriado);
+
+    const mensagemSucesso = estaEditando ? 'Evento atualizado com sucesso!' : 'Evento cadastrado com sucesso!';
 
     Alert.alert('Sucesso!', mensagemSucesso, [
       {
         text: 'OK',
         onPress: () => {
-          router.replace('/(funcoes)/eventos/detalhes');
+          router.replace({
+            pathname: '/(funcoes)/eventos/detalhes',
+            params: eventoCriado,
+          });
         },
       },
     ]);
@@ -381,7 +397,7 @@ export default function Eventos() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: params.editando === 'true' ? 'Editar evento' : 'Cadastrar evento',
+          title: estaEditando ? 'Editar evento' : 'Cadastrar evento',
           headerLeft: () => (
             <TouchableOpacity 
               onPress={() => router.replace('/')} 
@@ -400,7 +416,7 @@ export default function Eventos() {
           <View style={styles.intro}>
             <View style={styles.introIcon}><Ionicons name="calendar-outline" size={27} color="#7C3AED" /></View>
             <View style={styles.introText}>
-              <Text style={styles.title}>{params.editando === 'true' ? 'Editar evento' : 'Cadastrar evento'}</Text>
+              <Text style={styles.title}>{estaEditando ? 'Editar evento' : 'Cadastrar evento'}</Text>
               <Text style={styles.subtitle}>Preencha as informações do evento.</Text>
             </View>
           </View>
@@ -527,7 +543,7 @@ export default function Eventos() {
 
           <TouchableOpacity style={styles.primaryButton} onPress={handleCadastrar}>
             <Ionicons name="checkmark-circle-outline" size={21} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>{params.editando === 'true' ? 'Salvar alterações' : 'Cadastrar evento'}</Text>
+            <Text style={styles.primaryButtonText}>{estaEditando ? 'Salvar alterações' : 'Cadastrar evento'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelButton} onPress={irParaHome}>
             <Ionicons name="home-outline" size={19} color="#6D28D9" />

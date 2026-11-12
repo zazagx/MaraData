@@ -108,7 +108,16 @@ export default function Home() {
               Eventos
             </Text>
           </Pressable>
-
+    
+          <Pressable
+            onPress={() => router.push('/(funcoes)/eventos/historico')}
+            style={button.button}
+          >
+            <Text style={button.buttonText}>
+              Histórico
+            </Text>
+          </Pressable>
+        
         </View>
       </View>
     </>
