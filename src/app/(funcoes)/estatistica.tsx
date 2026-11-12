@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { BackHandler } from 'react-native';
+import { useTema } from '../../context/temaContexto';
+import { useEstilosTema } from '../../context/temaEstilos';
 
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
@@ -9,6 +11,8 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import { BarraJogo } from '../../components/BarraJogo';
 
 export default function EstatisticaScreen() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const [eventoSelecionado, setEventoSelecionado] = useState('Arena Games São Luís - MA');
   useFocusEffect(
   useCallback(() => {
@@ -31,9 +35,9 @@ export default function EstatisticaScreen() {
     headerShown: true,
     title: 'Estatísticas',
     headerStyle: {
-      backgroundColor: '#8000FF',
+      backgroundColor: tema.header,
     },
-    headerTintColor: '#FFFFFF',
+    headerTintColor: tema.text,
     headerTitleAlign: 'center',
 
     headerLeft: () => (
@@ -41,7 +45,7 @@ export default function EstatisticaScreen() {
         onPress={() => router.dismissTo('/')}
         style={{ marginLeft: 8 }}
       >
-        <Ionicons name="arrow-back" size={25} color="#FFFFFF" />
+        <Ionicons name="arrow-back" size={25} color={tema.text} />
       </TouchableOpacity>
     ),
   }}
@@ -97,7 +101,7 @@ export default function EstatisticaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5', // Cinza claro padrão do fundo do app

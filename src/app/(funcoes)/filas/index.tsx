@@ -1,9 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 import { buscarFilas, type Fila } from '../../../features/armazenamentofilas';
 
 export default function ListaFilas() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const router = useRouter();
   const params = useLocalSearchParams<{
     nomeEvento?: string;
@@ -44,12 +49,12 @@ function abrirCriacao() {
     <View style={styles.container}>
       <Stack.Screen options={{
         title: 'Filas',
-        headerStyle: { backgroundColor: '#8000ff' },
-        headerTintColor: '#ffffff',
+        headerStyle: { backgroundColor: tema.header },
+        headerTintColor: tema.text,
         headerTitleAlign: 'center',
         headerLeft: () => (
           <Pressable onPress={() => router.replace('/')} style={{ marginLeft: 8 }}>
-            <Image source={require('../../../components/icons/arrow_left.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
+            <Ionicons name="arrow-back" size={24} color={tema.text} />
           </Pressable>
         ),
         headerRight: () => (
@@ -112,7 +117,7 @@ function abrirCriacao() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f1f1' },
   lista: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 25, flexGrow: 1 },
   botaoAdicionar: { backgroundColor: '#ffffff', width: 34, height: 34, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 10 },

@@ -2,6 +2,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Evento, useEvento } from '../../../../context/eventocontexto';
+import { useTema } from '../../../../context/temaContexto';
+import { useEstilosTema } from '../../../../context/temaEstilos';
 
 // Função auxiliar para converter string "DD/MM/AAAA" em objeto Date para ordenação correta
 const converterDataParaObjeto = (dataStr: string) => {
@@ -11,6 +13,8 @@ const converterDataParaObjeto = (dataStr: string) => {
 };
 
 export default function HistoricoIndex() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const { evento: eventoAtivo, eventos } = useEvento();
 
   const temEvento = eventoAtivo && eventoAtivo.nomeEvento;
@@ -80,7 +84,7 @@ export default function HistoricoIndex() {
         </View>
       ) : (
         <View style={styles.secaoBoxVazio}>
-          <MaterialCommunityIcons name="calendar-blank" size={32} color="#8B5CF6" />
+          <MaterialCommunityIcons name="calendar-blank" size={32} color={tema.primary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.vazioTitulo}>Nenhum evento em andamento</Text>
             <Text style={styles.vazioSub}>
@@ -93,7 +97,7 @@ export default function HistoricoIndex() {
       {/* SEÇÃO: EVENTOS AGENDADOS (Mostra no máximo os 3 primeiros ordenados) */}
       <View style={styles.secaoCabecalho}>
         <View style={styles.secaoTituloRow}>
-          <Ionicons name="calendar" size={18} color="#7C3AED" />
+          <Ionicons name="calendar" size={18} color={tema.primary} />
           <Text style={styles.secaoTitulo}>Eventos Agendados</Text>
         </View>
         <Pressable onPress={() => router.push('/(funcoes)/eventos/historico/agendados')}>
@@ -119,7 +123,7 @@ export default function HistoricoIndex() {
             <View style={styles.badgeStatusAgendado}>
               <Text style={styles.textoStatusAgendado}>Agendado</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={{ marginLeft: 8 }} />
+            <Ionicons name="chevron-forward" size={18} color={tema.textSecondary} style={{ marginLeft: 8 }} />
           </Pressable>
         ))
       ) : (
@@ -129,7 +133,7 @@ export default function HistoricoIndex() {
       {/* SEÇÃO: EVENTOS PASSADOS (Mostra no máximo os 3 primeiros) */}
       <View style={[styles.secaoCabecalho, { marginTop: 20 }]}>
         <View style={styles.secaoTituloRow}>
-          <Ionicons name="time" size={18} color="#7C3AED" />
+          <Ionicons name="time" size={18} color={tema.primary} />
           <Text style={styles.secaoTitulo}>Eventos Passados</Text>
         </View>
         <Pressable onPress={() => router.push('/(funcoes)/eventos/historico/passados')}>
@@ -155,7 +159,7 @@ export default function HistoricoIndex() {
             <View style={styles.badgeStatusFinalizado}>
               <Text style={styles.textoStatusFinalizado}>Finalizado</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={{ marginLeft: 8 }} />
+            <Ionicons name="chevron-forward" size={18} color={tema.textSecondary} style={{ marginLeft: 8 }} />
           </Pressable>
         ))
       ) : (
@@ -166,7 +170,7 @@ export default function HistoricoIndex() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { padding: 20, backgroundColor: '#F7F5FC', flexGrow: 1 },
   header: { marginBottom: 20, marginTop: 10 },
   titulo: { fontSize: 24, fontWeight: '900', color: '#1E1B2E', marginBottom: 4 },

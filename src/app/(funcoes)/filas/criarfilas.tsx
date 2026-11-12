@@ -1,9 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 import { salvarFila } from '../../../features/armazenamentofilas';
 
 export default function CriarFila() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const router = useRouter();
   const params = useLocalSearchParams<{
     nomeEvento?: string;
@@ -57,7 +61,7 @@ const eventoAtivo =
         <TextInput
           style={styles.input}
           placeholder="Ex.: Console, Just Dance..."
-          placeholderTextColor="#888"
+          placeholderTextColor={tema.textSecondary}
           value={nome}
           onChangeText={(texto) => { setNome(texto); setErroNome(''); }}
         />
@@ -78,7 +82,7 @@ const eventoAtivo =
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   conteudo: { flexGrow: 1, backgroundColor: '#f1f1f1', padding: 20 },
   formulario: { width: '100%', maxWidth: 600, alignSelf: 'center', paddingVertical: 15 },
   titulo: { fontSize: 23, fontWeight: 'bold', color: '#25234c', marginBottom: 8 },

@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Evento, useEvento } from '../../../../context/eventocontexto';
+import { useTema } from '../../../../context/temaContexto';
+import { useEstilosTema } from '../../../../context/temaEstilos';
 
 const converterDataParaObjeto = (dataStr: string) => {
   if (!dataStr || dataStr.length < 10) return new Date(9999, 11, 31);
@@ -10,6 +12,8 @@ const converterDataParaObjeto = (dataStr: string) => {
 };
 
 export default function AgendadosScreen() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const { eventos, setEvento } = useEvento();
 
   // Filtra e ordena por data mais próxima
@@ -41,7 +45,7 @@ export default function AgendadosScreen() {
       {/* CABEÇALHO */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.botaoVoltar}>
-          <Ionicons name="arrow-back" size={20} color="#1E1B2E" />
+          <Ionicons name="arrow-back" size={20} color={tema.text} />
         </Pressable>
         <View>
           <Text style={styles.titulo}>Eventos Agendados</Text>
@@ -68,12 +72,12 @@ export default function AgendadosScreen() {
             <View style={styles.badgeStatus}>
               <Text style={styles.textoStatus}>Agendado</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={{ marginLeft: 8 }} />
+            <Ionicons name="chevron-forward" size={18} color={tema.textSecondary} style={{ marginLeft: 8 }} />
           </Pressable>
         ))
       ) : (
         <View style={styles.vazioContainer}>
-          <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
+          <Ionicons name="calendar-outline" size={48} color={tema.textSecondary} />
           <Text style={styles.vazioTexto}>Nenhum evento agendado no momento.</Text>
         </View>
       )}
@@ -82,7 +86,7 @@ export default function AgendadosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { padding: 20, backgroundColor: '#F7F5FC', flexGrow: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24, marginTop: 10 },
   botaoVoltar: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ECE6F0' },

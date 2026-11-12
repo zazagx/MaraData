@@ -17,6 +17,8 @@ import {
   View,
 } from 'react-native';
 import { Evento, useEvento } from '../../context/eventocontexto';
+import { useTema } from '../../context/temaContexto';
+import { useEstilosTema } from '../../context/temaEstilos';
 
 type CampoDataOuHora = 'dataInicio' | 'dataTermino' | 'horarioInicio' | 'horarioTermino';
 type WheelColumnProps = {
@@ -34,6 +36,7 @@ const MESES = [
 const formatarNumero = (valor: number) => String(valor).padStart(2, '0');
 
 function WheelColumn({ label, values, value, onChange }: WheelColumnProps) {
+  const styles = useEstilosTema(estilosBase);
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const isInitialMount = useRef(true);
 
@@ -84,6 +87,8 @@ function WheelColumn({ label, values, value, onChange }: WheelColumnProps) {
 }
 
 export default function Eventos() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const { setEvento, adicionarEvento, eventos } = useEvento();
   
   const params = useLocalSearchParams<{
@@ -404,7 +409,7 @@ export default function Eventos() {
               style={{ marginLeft: 4, marginRight: 12 }}
               accessibilityLabel="Voltar para Home"
             >
-              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+              <Ionicons name="arrow-back" size={24} color={tema.text} />
             </TouchableOpacity>
           ),
         }}
@@ -414,7 +419,7 @@ export default function Eventos() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           
           <View style={styles.intro}>
-            <View style={styles.introIcon}><Ionicons name="calendar-outline" size={27} color="#7C3AED" /></View>
+            <View style={styles.introIcon}><Ionicons name="calendar-outline" size={27} color={tema.primary} /></View>
             <View style={styles.introText}>
               <Text style={styles.title}>{estaEditando ? 'Editar evento' : 'Cadastrar evento'}</Text>
               <Text style={styles.subtitle}>Preencha as informações do evento.</Text>
@@ -426,11 +431,11 @@ export default function Eventos() {
 
             <Text style={styles.label}>Nome do evento <Text style={styles.requiredStar}>*</Text></Text>
             <View style={[styles.inputContainer, !!erros.nomeEvento && styles.inputError]}>
-              <Ionicons name="game-controller-outline" size={19} color="#8B5CF6" />
+              <Ionicons name="game-controller-outline" size={19} color={tema.primary} />
               <TextInput
                 style={styles.inputText}
                 placeholder="Ex: Torneio de FIFA"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={tema.textSecondary}
                 value={nomeEvento}
                 onChangeText={(text) => {
                   setNomeEvento(text);
@@ -442,11 +447,11 @@ export default function Eventos() {
 
             <Text style={styles.label}>Local do evento <Text style={styles.requiredStar}>*</Text></Text>
             <View style={[styles.inputContainer, !!erros.localEvento && styles.inputError]}>
-              <Ionicons name="location-outline" size={19} color="#8B5CF6" />
+              <Ionicons name="location-outline" size={19} color={tema.primary} />
               <TextInput
                 style={styles.inputText}
                 placeholder="Ex: Arena Maragames"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={tema.textSecondary}
                 value={localEvento}
                 onChangeText={(text) => {
                   setLocalEvento(text);
@@ -464,7 +469,7 @@ export default function Eventos() {
                     <Text style={[styles.pickerValue, !dataInicio && styles.placeholder]}>{dataInicio || 'DD/MM/AAAA'}</Text>
                     <Text style={styles.pickerHint}>Selecionar data</Text>
                   </View>
-                  <Ionicons name="calendar-outline" size={20} color="#7C3AED" />
+                  <Ionicons name="calendar-outline" size={20} color={tema.primary} />
                 </TouchableOpacity>
                 {erros.dataInicio && <Text style={styles.errorText}>{String(erros.dataInicio)}</Text>}
               </View>
@@ -476,7 +481,7 @@ export default function Eventos() {
                     <Text style={[styles.pickerValue, !dataTermino && styles.placeholder]}>{dataTermino || 'DD/MM/AAAA'}</Text>
                     <Text style={styles.pickerHint}>{dataTermino ? 'Toque para alterar' : 'Opcional'}</Text>
                   </View>
-                  <Ionicons name="calendar-outline" size={20} color="#7C3AED" />
+                  <Ionicons name="calendar-outline" size={20} color={tema.primary} />
                 </TouchableOpacity>
                 {erros.dataTermino && <Text style={styles.errorText}>{String(erros.dataTermino)}</Text>}
               </View>
@@ -490,7 +495,7 @@ export default function Eventos() {
                     <Text style={[styles.pickerValue, !horarioInicio && styles.placeholder]}>{horarioInicio || '--:--'}</Text>
                     <Text style={styles.pickerHint}>Selecionar hora</Text>
                   </View>
-                  <Ionicons name="time-outline" size={20} color="#7C3AED" />
+                  <Ionicons name="time-outline" size={20} color={tema.primary} />
                 </TouchableOpacity>
                 {erros.horarioInicio && <Text style={styles.errorText}>{String(erros.horarioInicio)}</Text>}
               </View>
@@ -502,7 +507,7 @@ export default function Eventos() {
                     <Text style={[styles.pickerValue, !horarioTermino && styles.placeholder]}>{horarioTermino || '--:--'}</Text>
                     <Text style={styles.pickerHint}>{horarioTermino ? 'Toque para alterar' : 'Opcional'}</Text>
                   </View>
-                  <Ionicons name="time-outline" size={20} color="#7C3AED" />
+                  <Ionicons name="time-outline" size={20} color={tema.primary} />
                 </TouchableOpacity>
                 {erros.horarioTermino && <Text style={styles.errorText}>{String(erros.horarioTermino)}</Text>}
               </View>
@@ -513,7 +518,7 @@ export default function Eventos() {
               <TextInput
                 style={[styles.inputText, styles.descriptionInput]}
                 placeholder="Informações adicionais sobre o evento..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={tema.textSecondary}
                 value={descricao}
                 onChangeText={setDescricao}
                 multiline
@@ -528,14 +533,14 @@ export default function Eventos() {
                 style={[styles.statusOption, situacao === 'agendado' && styles.statusOptionActive]}
                 onPress={() => setSituacao('agendado')}
               >
-                <Ionicons name="calendar-outline" size={18} color={situacao === 'agendado' ? '#FFFFFF' : '#6B7280'} />
+                <Ionicons name="calendar-outline" size={18} color={situacao === 'agendado' ? '#FFFFFF' : tema.textSecondary} />
                 <Text style={[styles.statusText, situacao === 'agendado' && styles.statusTextActive]} numberOfLines={1}>Agendar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.statusOption, situacao === 'em_andamento' && styles.statusOptionActive]}
                 onPress={selecionarEmAndamento}
               >
-                <Ionicons name="play-circle-outline" size={19} color={situacao === 'em_andamento' ? '#FFFFFF' : '#6B7280'} />
+                <Ionicons name="play-circle-outline" size={19} color={situacao === 'em_andamento' ? '#FFFFFF' : tema.textSecondary} />
                 <Text style={[styles.statusText, situacao === 'em_andamento' && styles.statusTextActive]} numberOfLines={1}>Iniciar Agora</Text>
               </TouchableOpacity>
             </View>
@@ -546,7 +551,7 @@ export default function Eventos() {
             <Text style={styles.primaryButtonText}>{estaEditando ? 'Salvar alterações' : 'Cadastrar evento'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelButton} onPress={irParaHome}>
-            <Ionicons name="home-outline" size={19} color="#6D28D9" />
+            <Ionicons name="home-outline" size={19} color={tema.primary} />
             <Text style={styles.cancelButtonText}>Voltar para Home</Text>
           </TouchableOpacity>
           <Text style={styles.footerNote}>* Campos obrigatórios</Text>
@@ -559,19 +564,19 @@ export default function Eventos() {
             {campoAtivo.includes('data') ? (
               <>
                 <View style={styles.modalHeader}>
-                  <View style={styles.modalHeaderIcon}><Ionicons name="calendar-outline" size={22} color="#7C3AED" /></View>
+                  <View style={styles.modalHeaderIcon}><Ionicons name="calendar-outline" size={22} color={tema.primary} /></View>
                   <Text style={styles.modalTitle}>Selecionar data</Text>
                   <TouchableOpacity onPress={() => setPickerVisivel(false)} style={styles.closeButton}>
-                    <Ionicons name="close" size={22} color="#6B7280" />
+                    <Ionicons name="close" size={22} color={tema.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.calendarHeader}>
                   <TouchableOpacity style={styles.monthArrow} onPress={() => mudarMes(-1)}>
-                    <Ionicons name="chevron-back" size={21} color="#7C3AED" />
+                    <Ionicons name="chevron-back" size={21} color={tema.primary} />
                   </TouchableOpacity>
                   <Text style={styles.calendarMonthText}>{`${MESES[mesAtual]} ${anoAtual}`}</Text>
                   <TouchableOpacity style={styles.monthArrow} onPress={() => mudarMes(1)}>
-                    <Ionicons name="chevron-forward" size={21} color="#7C3AED" />
+                    <Ionicons name="chevron-forward" size={21} color={tema.primary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.weekHeader}>
@@ -599,7 +604,7 @@ export default function Eventos() {
             ) : (
               <>
                 <View style={styles.modalHeader}>
-                  <View style={styles.modalHeaderIcon}><Ionicons name="time-outline" size={22} color="#7C3AED" /></View>
+                  <View style={styles.modalHeaderIcon}><Ionicons name="time-outline" size={22} color={tema.primary} /></View>
                   <View style={styles.modalHeadingText}>
                     <Text style={styles.modalTitle}>Escolha um horário</Text>
                     <Text style={styles.modalSubtitle}>
@@ -607,7 +612,7 @@ export default function Eventos() {
                     </Text>
                   </View>
                   <TouchableOpacity onPress={() => setPickerVisivel(false)} style={styles.closeButton}>
-                    <Ionicons name="close" size={22} color="#6B7280" />
+                    <Ionicons name="close" size={22} color={tema.textSecondary} />
                   </TouchableOpacity>
                 </View>
 
@@ -616,7 +621,7 @@ export default function Eventos() {
                     style={[styles.modeSwitchTab, !modoTeclado && styles.modeSwitchTabActive]}
                     onPress={() => setModoTeclado(false)}
                   >
-                    <Ionicons name="options-outline" size={16} color={!modoTeclado ? '#7C3AED' : '#6B7280'} />
+                    <Ionicons name="options-outline" size={16} color={!modoTeclado ? tema.primary : tema.textSecondary} />
                     <Text style={[styles.modeSwitchText, !modoTeclado && styles.modeSwitchTextActive]}>Roleta</Text>
                   </TouchableOpacity>
 
@@ -624,7 +629,7 @@ export default function Eventos() {
                     style={[styles.modeSwitchTab, modoTeclado && styles.modeSwitchTabActive]}
                     onPress={() => setModoTeclado(true)}
                   >
-                    <Ionicons name="keypad-outline" size={16} color={modoTeclado ? '#7C3AED' : '#6B7280'} />
+                    <Ionicons name="keypad-outline" size={16} color={modoTeclado ? tema.primary : tema.textSecondary} />
                     <Text style={[styles.modeSwitchText, modoTeclado && styles.modeSwitchTextActive]}>Teclado</Text>
                   </TouchableOpacity>
                 </View>
@@ -635,7 +640,7 @@ export default function Eventos() {
                     <TextInput
                       style={styles.keyboardDirectInput}
                       placeholder="15:32"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={tema.textSecondary}
                       keyboardType="numeric"
                       maxLength={5}
                       value={textoHoraDigitada}
@@ -658,7 +663,7 @@ export default function Eventos() {
                       <WheelColumn label="MINUTOS" values={valoresMinutos} value={tempMinuto} onChange={setTempMinuto} />
                     </View>
                     <View style={styles.timeSelectedPreview}>
-                      <Ionicons name="checkmark-circle" size={17} color="#7C3AED" />
+                      <Ionicons name="checkmark-circle" size={17} color={tema.primary} />
                       <Text style={styles.timePreviewText}>Horário selecionado: <Text style={styles.timePreviewStrong}>{formatarNumero(tempHora)}:{formatarNumero(tempMinuto)}</Text></Text>
                     </View>
                   </>
@@ -695,7 +700,7 @@ export default function Eventos() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F6FB' },
   keyboard: { flex: 1 },
   content: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 36 },

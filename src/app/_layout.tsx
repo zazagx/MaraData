@@ -1,17 +1,90 @@
-
+import { Ionicons } from "@expo/vector-icons";
 import { Drawer } from "expo-router/drawer";
+import { StatusBar } from "expo-status-bar";
+
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
 import { EventProvider } from "../context/eventocontexto";
-import { Image, StyleSheet, Text, View } from 'react-native';
-export default function RootLayout() {
+import { TemaProvider, useTema } from "../context/temaContexto";
+
+// Componente responsável pela navegação
+function ConteudoLayout() {
+  const { tema, modoEscuro, alternarTema } = useTema();
+
   return (
-    <EventProvider>
+    <>
+      <StatusBar style={modoEscuro ? "light" : "dark"} />
+
       <Drawer
         screenOptions={{
+          headerLeft: () => (
+            <Image
+              source={require("../../assets/images/Logo-MaraGames.png")}
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
+          ),
+
+          // Botão de alternância do tema
+          headerRight: () => (
+            <TouchableOpacity
+              style={[
+                styles.themeButton,
+                { backgroundColor: tema.surfaceSecondary },
+              ]}
+              onPress={alternarTema}
+              accessibilityRole="button"
+              accessibilityLabel={
+                modoEscuro
+                  ? "Ativar tema claro"
+                  : "Ativar tema escuro"
+              }
+            >
+              <Ionicons
+                name={
+                  modoEscuro ? "sunny-outline" : "moon-outline"
+                }
+                size={23}
+                color={tema.primary}
+              />
+            </TouchableOpacity>
+          ),
+
+          // Cabeçalho
           headerStyle: {
-            backgroundColor: "#8000ff",
+            backgroundColor: tema.header,
           },
-          headerTitleAlign: "center",
-          headerTintColor: "#ffffff",
+
+          headerTitleAlign: "left",
+          headerTintColor: tema.text,
+
+          // Menu lateral
+          drawerStyle: {
+            backgroundColor: tema.drawer,
+          },
+
+          drawerContentStyle: {
+            backgroundColor: tema.drawer,
+          },
+
+          drawerActiveTintColor: tema.primary,
+          drawerInactiveTintColor: tema.textSecondary,
+          drawerActiveBackgroundColor: tema.activeBackground,
+
+          drawerLabelStyle: {
+            fontSize: 15,
+          },
+
+          // Fundo da área das telas
+          sceneStyle: {
+            backgroundColor: tema.background,
+          },
         }}
       >
         <Drawer.Screen
@@ -19,14 +92,17 @@ export default function RootLayout() {
           options={{
             title: "HeaderTitle",
             drawerLabel: "Início",
+
             headerTitle: () => (
               <View style={styles.headerTitle}>
-                <Image
-                  source={require("../../assets/images/Logo-MaraGames.png")}
-                  style={styles.headerLogo}
-                  resizeMode="contain"
-                />
-                <Text style={styles.headerTitleText}>MaraData</Text>
+                <Text
+                  style={[
+                    styles.headerTitleText,
+                    { color: tema.brand },
+                  ]}
+                >
+                  MaraData
+                </Text>
               </View>
             ),
           }}
@@ -50,24 +126,45 @@ export default function RootLayout() {
           }}
         />
       </Drawer>
-    </EventProvider>
+    </>
+  );
+}
+
+// Layout principal: disponibiliza os dois contextos
+export default function RootLayout() {
+  return (
+    <TemaProvider>
+      <EventProvider>
+        <ConteudoLayout />
+      </EventProvider>
+    </TemaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
     gap: 8,
   },
+
   headerLogo: {
-    width: 50,
-    height: 50,
+    width: 42,
+    height: 42,
   },
+
   headerTitleText: {
-    color: '#ffffff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
+  },
+
+  themeButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
 });

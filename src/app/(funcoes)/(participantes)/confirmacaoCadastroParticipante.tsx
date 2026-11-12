@@ -1,8 +1,12 @@
 import { buscarUltimoParticipante } from '@/features/armazenamentoParticipantes';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 
 export default function ConfirmacaoCadastro() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const router = useRouter();
   const params = useLocalSearchParams<{ origem?: string; filaId?: string }>();
   const participante = buscarUltimoParticipante();
@@ -11,7 +15,7 @@ export default function ConfirmacaoCadastro() {
   if (!participante) {
     return (
       <View style={styles.container}>
-        <Text>Nenhum participante encontrado.</Text>
+        <Text style={{ color: tema.text }}>Nenhum participante encontrado.</Text>
         <Pressable style={styles.botao} onPress={() => router.replace('/filas')}>
           <Text style={styles.textoBotao}>Voltar para filas</Text>
         </Pressable>
@@ -53,7 +57,7 @@ export default function ConfirmacaoCadastro() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f1f1', padding: 20, alignItems: 'center', justifyContent: 'center' },
   iconeSucesso: { width: 85, height: 85, borderRadius: 45, backgroundColor: '#40bd91', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   check: { fontSize: 55, color: '#fff', fontWeight: 'bold' },

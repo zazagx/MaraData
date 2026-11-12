@@ -1,89 +1,71 @@
-import { Stack, router } from "expo-router";
-import { Image, Pressable, Text } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, router } from 'expo-router';
+import { Pressable, Text } from 'react-native';
+import { useTema } from '../../../context/temaContexto';
 
 export default function ParticipantesLayout() {
+  const { tema } = useTema();
 
   return (
-
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: "#8000ff",
+          backgroundColor: tema.header,
         },
-
-        headerTitleAlign: "center",
-        headerTintColor: "#ffffff",
+        headerTitleAlign: 'center',
+        headerTintColor: tema.text,
+        headerTitleStyle: {
+          color: tema.text,
+        },
+        contentStyle: {
+          backgroundColor: tema.background,
+        },
       }}
     >
-
-      {/* PARTICIPANTS LIST */}
-
       <Stack.Screen
         name="participantescadastrados"
         options={{
-          title: "Participantes",
-
-          // Custom back button: returns to Home.
+          title: 'Participantes',
           headerLeft: () => (
             <Pressable
-              onPress={() => router.replace("/")}
-              style={{ marginLeft: 8 }}
+              onPress={() => router.replace('/')}
+              style={{ marginLeft: 8, padding: 4 }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar para o início"
             >
-              <Image
-                source={require("../../../components/icons/arrow_left.png")}
-                style={{ width: 24, height: 24 }}
-                resizeMode="contain"
-              />
+              <Ionicons name="arrow-back" size={24} color={tema.text} />
             </Pressable>
           ),
-
-          // Button to register a new participant.
           headerRight: () => (
             <Pressable
-              onPress={() => router.push("/novoparticipante")}
+              onPress={() => router.push('/novoparticipante')}
               style={{
-                backgroundColor: "#ffffff",
-                width: 34,
-                height: 34,
+                backgroundColor: tema.surfaceSecondary,
+                width: 36,
+                height: 36,
                 borderRadius: 20,
-                justifyContent: "center",
-                alignItems: "center",
+                justifyContent: 'center',
+                alignItems: 'center',
                 marginRight: 8,
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Cadastrar participante"
             >
-              <Text
-                style={{
-                  color: "#8000ff",
-                  fontSize: 25,
-                  lineHeight: 30,
-                }}
-              >
-                +
-              </Text>
+              <Text style={{ color: tema.primary, fontSize: 25, lineHeight: 30 }}>+</Text>
             </Pressable>
           ),
         }}
       />
-
-      {/* REGISTRATION FORM */}
 
       <Stack.Screen
         name="novoparticipante"
-        options={{
-          title: "Cadastrar participante",
-        }}
+        options={{ title: 'Cadastrar participante' }}
       />
-
-      {/* CONFIRMATION */}
 
       <Stack.Screen
         name="confirmacaoCadastroParticipante"
-        options={{
-          title: "Cadastro realizado",
-        }}
+        options={{ title: 'Cadastro realizado' }}
       />
-
     </Stack>
-
   );
 }

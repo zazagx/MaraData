@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 
 import {
   buscarParticipantes,
@@ -29,6 +31,8 @@ function obterIniciais(nome: string) {
 }
 
 export default function GerenciarFila() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const router = useRouter();
   const { filaId } = useLocalSearchParams<{ filaId?: string }>();
   const [fila, setFila] = useState<Fila | undefined>();
@@ -57,7 +61,7 @@ export default function GerenciarFila() {
   if (!fila) {
     return (
       <View style={styles.centralizado}>
-        <Ionicons name="alert-circle-outline" size={42} color="#8000FF" />
+        <Ionicons name="alert-circle-outline" size={42} color={tema.primary} />
         <Text style={styles.vazioTitulo}>Fila não encontrada</Text>
         <Text style={styles.vazioDescricao}>Volte para a lista e abra uma fila existente.</Text>
         <Pressable style={styles.botaoPrincipal} onPress={() => router.replace('/filas')}>
@@ -159,11 +163,11 @@ export default function GerenciarFila() {
                   <Text style={styles.tipoAtendimento}>{participanteAtual.jogos.join(', ') || 'Atividade não informada'}</Text>
                 </View>
                 <View style={styles.divisorSenha} />
-                <View style={styles.iconeSenha}><Ionicons name="game-controller" size={38} color="#8000FF" /></View>
+                <View style={styles.iconeSenha}><Ionicons name="game-controller" size={38} color={tema.primary} /></View>
               </>
             ) : (
               <View style={styles.semParticipantes}>
-                <Ionicons name="people-outline" size={30} color="#8000FF" />
+                <Ionicons name="people-outline" size={30} color={tema.primary} />
                 <Text style={styles.semParticipantesTexto}>Sem participantes na fila</Text>
               </View>
             )}
@@ -176,7 +180,7 @@ export default function GerenciarFila() {
         </View>
 
         <View style={styles.cardProximo}>
-          <View style={styles.iconeProximo}><Ionicons name="people" size={28} color="#8000FF" /></View>
+          <View style={styles.iconeProximo}><Ionicons name="people" size={28} color={tema.primary} /></View>
           <View style={styles.dadosProximo}>
             <Text style={styles.rotuloProximo}>Próximo participante</Text>
             <Text style={styles.nomeProximo}>{proximoParticipante ? `${proximoParticipante.senha} • ${proximoParticipante.nome}` : 'Nenhum participante aguardando'}</Text>
@@ -222,7 +226,7 @@ export default function GerenciarFila() {
         </Pressable>
 
         <View style={styles.rodape}>
-          <Ionicons name="game-controller-outline" size={21} color="#8000FF" />
+          <Ionicons name="game-controller-outline" size={21} color={tema.primary} />
           <Text style={styles.textoRodape}>MaraData • Beast MaraGames</Text>
         </View>
       </ScrollView>
@@ -237,11 +241,11 @@ export default function GerenciarFila() {
                 <Text style={styles.modalTitulo}>Adicionar participante</Text>
                 <Text style={styles.modalSubtitulo}>Selecione alguém já cadastrado.</Text>
               </View>
-              <Pressable onPress={() => setModalParticipantesVisivel(false)} style={styles.fecharModal}><Ionicons name="close" size={22} color="#555" /></Pressable>
+              <Pressable onPress={() => setModalParticipantesVisivel(false)} style={styles.fecharModal}><Ionicons name="close" size={22} color={tema.textSecondary} /></Pressable>
             </View>
             <View style={styles.buscaContainer}>
-              <Ionicons name="search" size={19} color="#777" />
-              <TextInput style={styles.campoBusca} placeholder="Buscar participante..." placeholderTextColor="#888" value={busca} onChangeText={setBusca} />
+              <Ionicons name="search" size={19} color={tema.textSecondary} />
+              <TextInput style={styles.campoBusca} placeholder="Buscar participante..." placeholderTextColor={tema.textSecondary} value={busca} onChangeText={setBusca} />
             </View>
             {mensagemModal !== '' && <Text style={styles.mensagemModal}>{mensagemModal}</Text>}
             <FlatList
@@ -257,12 +261,12 @@ export default function GerenciarFila() {
                     <Text style={styles.nomeItemModal}>{item.nome}</Text>
                     <Text style={styles.jogosItemModal}>{item.jogos.join(', ') || 'Sem jogos informados'}</Text>
                   </View>
-                  <Ionicons name="add-circle" size={24} color="#8000FF" />
+                  <Ionicons name="add-circle" size={24} color={tema.primary} />
                 </Pressable>
               )}
             />
             <Pressable style={styles.botaoNaoCadastrado} onPress={abrirCadastroParticipante}>
-              <Ionicons name="person-add-outline" size={19} color="#8000FF" />
+              <Ionicons name="person-add-outline" size={19} color={tema.primary} />
               <Text style={styles.textoNaoCadastrado}>Participante não cadastrado?</Text>
             </Pressable>
           </View>
@@ -287,7 +291,7 @@ export default function GerenciarFila() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F2F2' },
   conteudo: { padding: 20, paddingBottom: 35, width: '100%', maxWidth: 900, alignSelf: 'center' },
   banner: { backgroundColor: '#8000FF', borderRadius: 22, padding: 22, marginBottom: 25 },

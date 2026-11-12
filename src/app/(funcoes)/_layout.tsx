@@ -1,21 +1,25 @@
-import { Stack } from "expo-router";
+import { Stack } from 'expo-router';
+import { useTema } from '../../context/temaContexto';
 
 export default function FuncoesLayout() {
+  const { tema } = useTema();
 
   return (
-
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: "#8000ff",
+          backgroundColor: tema.header,
         },
-
-        headerTitleAlign: "center",
-        headerTintColor: "#ffffff",
+        headerTitleAlign: 'center',
+        headerTintColor: tema.text,
+        headerTitleStyle: {
+          color: tema.text,
+        },
+        contentStyle: {
+          backgroundColor: tema.background,
+        },
       }}
     >
-
-      {/* PARTICIPANT SCREENS */}
       <Stack.Screen
         name="(participantes)"
         options={{
@@ -23,52 +27,35 @@ export default function FuncoesLayout() {
         }}
       />
 
-      {/* OTHER FUNCTIONALITIES */}
-
       <Stack.Screen
         name="eventos/detalhes"
-        options={{
-          title: "Detalhes do evento",
-        }}
+        options={{ title: 'Detalhes do evento' }}
       />
 
       <Stack.Screen
         name="eventos/cadastro"
-        options={{
-          title: "Evento cadastrado",
-        }}
+        options={{ title: 'Evento cadastrado' }}
       />
 
       <Stack.Screen
         name="filas"
-        options={{
-          headerShown: false,
-        }}
-      />  
+        options={{ headerShown: false }}
+      />
 
       <Stack.Screen
         name="estatistica"
-        options={{
-          title: "Estatísticas",
-        }}
+        options={{ title: 'Estatísticas' }}
       />
 
       <Stack.Screen
         name="eventos"
-        options={{
-          title: "Eventos",
-        }}
+        options={{ title: 'Eventos' }}
       />
 
       <Stack.Screen
         name="eventos/historico/index"
-        options={{
-          title: "Histórico de Eventos",
-        }}
+        options={{ title: 'Histórico de Eventos' }}
       />
-
     </Stack>
-
   );
-
 }

@@ -12,8 +12,12 @@ import {
   View,
 } from 'react-native';
 import { useEvento } from '../../../context/eventocontexto';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 
 export default function DetalhesEvento() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const { evento: eventoContexto, setEvento } = useEvento();
   const params = useLocalSearchParams<{
     nomeEvento?: string;
@@ -155,7 +159,7 @@ export default function DetalhesEvento() {
           {/* Local inserido pelo usuário[cite: 6] */}
           <View style={styles.infoRowBlock}>
             <View style={styles.infoIconBox}>
-              <Ionicons name="location" size={20} color="#7C3AED" />
+              <Ionicons name="location" size={20} color={tema.primary} />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Local</Text>
@@ -167,7 +171,7 @@ export default function DetalhesEvento() {
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
               <View style={styles.infoIconBoxSmall}>
-                <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+                <Ionicons name="calendar-outline" size={18} color={tema.primary} />
               </View>
               <Text style={styles.infoLabel}>Data de início</Text>
               <Text style={styles.infoValueBold}>{dataInicio}</Text>
@@ -176,7 +180,7 @@ export default function DetalhesEvento() {
             {dataTermino ? (
               <View style={styles.gridCol}>
                 <View style={styles.infoIconBoxSmall}>
-                  <Ionicons name="calendar" size={18} color="#7C3AED" />
+                  <Ionicons name="calendar" size={18} color={tema.primary} />
                 </View>
                 <Text style={styles.infoLabel}>Data de término</Text>
                 <Text style={styles.infoValueBold}>{dataTermino}</Text>
@@ -188,7 +192,7 @@ export default function DetalhesEvento() {
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
               <View style={styles.infoIconBoxSmall}>
-                <Ionicons name="time-outline" size={18} color="#7C3AED" />
+                <Ionicons name="time-outline" size={18} color={tema.primary} />
               </View>
               <Text style={styles.infoLabel}>Horário de início</Text>
               <Text style={styles.infoValueBold}>{horarioInicio}</Text>
@@ -197,7 +201,7 @@ export default function DetalhesEvento() {
             {horarioTermino ? (
               <View style={styles.gridCol}>
                 <View style={styles.infoIconBoxSmall}>
-                  <Ionicons name="time" size={18} color="#7C3AED" />
+                  <Ionicons name="time" size={18} color={tema.primary} />
                 </View>
                 <Text style={styles.infoLabel}>Horário de término</Text>
                 <Text style={styles.infoValueBold}>{horarioTermino}</Text>
@@ -209,7 +213,7 @@ export default function DetalhesEvento() {
           {descricao ? (
             <View style={styles.infoRowBlock}>
               <View style={styles.infoIconBox}>
-                <Ionicons name="document-text-outline" size={20} color="#7C3AED" />
+                <Ionicons name="document-text-outline" size={20} color={tema.primary} />
               </View>
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Descrição</Text>
@@ -221,13 +225,13 @@ export default function DetalhesEvento() {
           {/* Situação[cite: 6] */}
           <TouchableOpacity style={styles.situationRow} onPress={() => setModalMenuVisivel(true)}>
             <View style={styles.infoIconBoxSmall}>
-              <Ionicons name="calendar" size={18} color="#7C3AED" />
+              <Ionicons name="calendar" size={18} color={tema.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.infoLabel}>Situação do evento</Text>
               <Text style={styles.infoValueBold}>{situacaoFormatada.toLowerCase().replace('_', ' ')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            <Ionicons name="chevron-forward" size={18} color={tema.textSecondary} />
           </TouchableOpacity>
 
           {/* Ações Administrativas[cite: 6] */}
@@ -235,7 +239,7 @@ export default function DetalhesEvento() {
           
           <View style={styles.adminButtonsRow}>
             <TouchableOpacity style={styles.btnEditar} onPress={irParaEdicao}>
-              <Ionicons name="pencil-outline" size={16} color="#6D28D9" />
+              <Ionicons name="pencil-outline" size={16} color={tema.primary} />
               <Text style={styles.btnEditarText}>Editar evento</Text>
             </TouchableOpacity>
 
@@ -246,7 +250,7 @@ export default function DetalhesEvento() {
           </View>
 
           <View style={styles.warningNote}>
-            <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+            <Ionicons name="information-circle-outline" size={16} color={tema.textSecondary} />
             <Text style={styles.warningNoteText}>
               {situacao === 'agendado' 
                 ? 'O evento só pode ser encerrado quando estiver em andamento.' 
@@ -260,7 +264,7 @@ export default function DetalhesEvento() {
           <View style={styles.quickAccessGrid}>
             <TouchableOpacity style={styles.quickAccessCard} onPress={() => acessarNavegacao('participantes')}>
               <View style={styles.quickIconBox}>
-                <Ionicons name="people-outline" size={22} color="#7C3AED" />
+                <Ionicons name="people-outline" size={22} color={tema.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.quickCardTitle}>Participantes</Text>
@@ -271,7 +275,7 @@ export default function DetalhesEvento() {
 
             <TouchableOpacity style={styles.quickAccessCard} onPress={() => acessarNavegacao('filas')}>
               <View style={styles.quickIconBox}>
-                <Ionicons name="list-outline" size={22} color="#7C3AED" />
+                <Ionicons name="list-outline" size={22} color={tema.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.quickCardTitle}>Filas</Text>
@@ -282,7 +286,7 @@ export default function DetalhesEvento() {
 
             <TouchableOpacity style={styles.quickAccessCard} onPress={() => acessarNavegacao('estatisticas')}>
               <View style={styles.quickIconBox}>
-                <Ionicons name="stats-chart-outline" size={22} color="#7C3AED" />
+                <Ionicons name="stats-chart-outline" size={22} color={tema.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.quickCardTitle}>Estatísticas</Text>
@@ -300,7 +304,7 @@ export default function DetalhesEvento() {
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalMenuVisivel(false)}>
           <View style={styles.bottomSheetCard}>
             <TouchableOpacity style={styles.sheetOption} onPress={() => { setModalMenuVisivel(false); irParaEdicao(); }}>
-              <Ionicons name="pencil-outline" size={20} color="#6D28D9" />
+              <Ionicons name="pencil-outline" size={20} color={tema.primary} />
               <Text style={styles.sheetOptionText}>Editar evento</Text>
             </TouchableOpacity>
 
@@ -342,7 +346,7 @@ export default function DetalhesEvento() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1E1035' },
   content: { flexGrow: 1, backgroundColor: '#1E1035' },
 

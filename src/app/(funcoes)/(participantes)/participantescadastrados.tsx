@@ -1,10 +1,12 @@
 import {
   buscarParticipantes,
   type Participante
-} from '@/features/armazenamentoParticipantes'
+} from '@/features/armazenamentoParticipantes';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 
-import { Stack, useFocusEffect, useRouter } from 'expo-router'
-import { useCallback, useState } from 'react'
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 
 import {
   FlatList,
@@ -15,7 +17,7 @@ import {
   Text,
   TextInput,
   View
-} from 'react-native'
+} from 'react-native';
 
 
 function calcularIdade(dataNascimento: string) {
@@ -51,6 +53,8 @@ function obterIniciais(nome: string) {
 
 
 export default function ParticipantesCadastrados() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
 
   const router = useRouter()
 
@@ -87,9 +91,9 @@ export default function ParticipantesCadastrados() {
         options={{
           title: 'Participantes',
           headerStyle: {
-            backgroundColor: '#8000ff',
+            backgroundColor: tema.header,
           },
-          headerTintColor: '#fff',
+          headerTintColor: tema.text,
           headerTitleStyle: {
             fontWeight: 'bold',
           },
@@ -123,7 +127,7 @@ export default function ParticipantesCadastrados() {
             <TextInput
               style={styles.campoBusca}
               placeholder="Buscar participante..."
-              placeholderTextColor="#777"
+              placeholderTextColor={tema.textSecondary}
               value={busca}
               onChangeText={setBusca}
             />
@@ -292,7 +296,7 @@ export default function ParticipantesCadastrados() {
 }
 
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
 
   container: {
     flex: 1,

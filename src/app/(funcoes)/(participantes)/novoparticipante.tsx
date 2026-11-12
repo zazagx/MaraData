@@ -3,13 +3,15 @@ import {
   buscarJogos,
   salvarParticipante,
   type Participante
-} from '@/features/armazenamentoParticipantes'
+} from '@/features/armazenamentoParticipantes';
+import { useTema } from '../../../context/temaContexto';
+import { useEstilosTema } from '../../../context/temaEstilos';
 
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 
-import { adicionarParticipanteAFila } from '@/features/armazenamentofilas'
-import { useLocalSearchParams } from 'expo-router'
+import { adicionarParticipanteAFila } from '@/features/armazenamentofilas';
+import { useLocalSearchParams } from 'expo-router';
 import {
   Modal,
   Platform,
@@ -19,7 +21,7 @@ import {
   Text,
   TextInput,
   View
-} from 'react-native'
+} from 'react-native';
 
 // Load the native date picker only on mobile platforms.
 // The web version will use a regular text field instead.
@@ -115,6 +117,7 @@ function CampoSelecao({
   aoAbrir: () => void
   aoSelecionar: (valor: string) => void
 }) {
+  const styles = useEstilosTema(estilosBase);
   return (
     <View style={styles.campo}>
 
@@ -176,6 +179,7 @@ function CampoSimNao({
   erro: string
   aoSelecionar: (valor: string) => void
 }) {
+  const styles = useEstilosTema(estilosBase);
   return (
     <View style={styles.campo}>
 
@@ -219,6 +223,8 @@ function CampoSimNao({
 
 
 export default function novoparticipante() {
+  const { tema, modoEscuro } = useTema();
+  const styles = useEstilosTema(estilosBase);
 
   const router = useRouter()
   const params = useLocalSearchParams<{ origem?: string; filaId?: string }>()
@@ -537,6 +543,7 @@ if (!temErro) {
 
           <TextInput
             placeholder="Digite o nome"
+            placeholderTextColor={tema.textSecondary}
             value={participante.nome}
             onChangeText={(texto) => alterarCampo('nome', texto)}
             style={styles.inputBox}
@@ -557,6 +564,7 @@ if (!temErro) {
 
             <TextInput
               placeholder="DD/MM/AAAA"
+            placeholderTextColor={tema.textSecondary}
               value={dataNascimentoWeb}
               onChangeText={alterarDataWeb}
               keyboardType="numeric"
@@ -637,6 +645,7 @@ if (!temErro) {
 
             <TextInput
               placeholder="Buscar um jogo ou adicionar um novo"
+            placeholderTextColor={tema.textSecondary}
               value={buscaJogo}
               onChangeText={setBuscaJogo}
               style={styles.inputBox}
@@ -783,8 +792,8 @@ if (!temErro) {
                 locale="pt-BR"
                 maximumDate={new Date()}
 
-                themeVariant="light"
-                textColor="#222222"
+                themeVariant={modoEscuro ? 'dark' : 'light'}
+                textColor={tema.text}
                 
                 onChange={(_evento: any, dataSelecionada?: Date) => {
                   if (dataSelecionada) {
@@ -806,7 +815,7 @@ if (!temErro) {
 }
 
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
 
   conteudo: {
     flexGrow: 1,
@@ -824,6 +833,7 @@ const styles = StyleSheet.create({
   },
 
   textDesing: {
+    color: '#222',
     fontSize: 16,
     fontWeight: 'bold',
     paddingVertical: 12,
@@ -833,6 +843,7 @@ const styles = StyleSheet.create({
 
   inputBox: {
     backgroundColor: '#d0d0d1b1',
+    color: '#222',
     padding: 15,
     width: '100%',
     borderRadius: 10,

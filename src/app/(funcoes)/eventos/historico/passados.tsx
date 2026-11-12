@@ -2,8 +2,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEvento } from '../../../../context/eventocontexto';
+import { useTema } from '../../../../context/temaContexto';
+import { useEstilosTema } from '../../../../context/temaEstilos';
 
 export default function PassadosScreen() {
+  const { tema } = useTema();
+  const styles = useEstilosTema(estilosBase);
   const { eventos } = useEvento();
 
   // Filtra apenas os eventos que estão com a situação 'encerrado' (ou passados)
@@ -15,7 +19,7 @@ export default function PassadosScreen() {
       {/* CABEÇALHO */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.botaoVoltar}>
-          <Ionicons name="arrow-back" size={20} color="#1E1B2E" />
+          <Ionicons name="arrow-back" size={20} color={tema.text} />
         </Pressable>
         <View>
           <Text style={styles.titulo}>Eventos Passados</Text>
@@ -42,7 +46,7 @@ export default function PassadosScreen() {
         ))
       ) : (
         <View style={styles.vazioContainer}>
-          <MaterialCommunityIcons name="history" size={48} color="#9CA3AF" />
+          <MaterialCommunityIcons name="history" size={48} color={tema.textSecondary} />
           <Text style={styles.vazioTexto}>Nenhum evento passado registrado.</Text>
         </View>
       )}
@@ -51,7 +55,7 @@ export default function PassadosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const estilosBase = StyleSheet.create({
   container: {
     padding: 20,
     backgroundColor: '#F7F5FC',
