@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import {
   FlatList,
@@ -16,7 +16,11 @@ import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 
 import {
+  buscarCatalogoJogos,
   buscarParticipantes,
+  buscarParticipantePorId,
+  obterOuCriarJogoNoCatalogo,
+  type JogoCatalogo,
   type Participante,
 } from '@/features/armazenamentoParticipantes';
 import {
@@ -36,10 +40,19 @@ export default function GerenciarFila() {
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
   const router = useRouter();
-  const { filaId } = useLocalSearchParams<{ filaId?: string }>();
+  const { filaId, participanteNovoId } = useLocalSearchParams<{
+    filaId?: string;
+    participanteNovoId?: string;
+  }>();
   const [fila, setFila] = useState<Fila | undefined>();
   const [carregandoFila, setCarregandoFila] = useState(true);
   const [participantesCadastrados, setParticipantesCadastrados] = useState<Participante[]>([]);
+  const [catalogoJogos, setCatalogoJogos] = useState<JogoCatalogo[]>([]);
+  const [participanteSelecionado, setParticipanteSelecionado] = useState<Participante | null>(null);
+  const [jogoSelecionado, setJogoSelecionado] = useState<JogoCatalogo | null>(null);
+  const [buscaJogo, setBuscaJogo] = useState('');
+  const [salvandoNaFila, setSalvandoNaFila] = useState(false);
+  const participanteNovoProcessado = useRef<string | null>(null);
   const [modalParticipantesVisivel, setModalParticipantesVisivel] = useState(false);
   const [modalEncerrarVisivel, setModalEncerrarVisivel] = useState(false);
   const [busca, setBusca] = useState('');
@@ -50,6 +63,11 @@ export default function GerenciarFila() {
     setParticipantesCadastrados(participantes);
   }, [db]);
 
+  const carregarCatalogoJogos = useCallback(async () => {
+    const jogos = await buscarCatalogoJogos(db);
+    setCatalogoJogos(jogos);
+  }, [db]);
+
   const atualizarTela = useCallback(async () => {
     setCarregandoFila(true);
     try {
@@ -58,18 +76,47 @@ export default function GerenciarFila() {
       } else {
         setFila(undefined);
       }
-      await carregarParticipantesCadastrados();
+      await Promise.all([carregarParticipantesCadastrados(), carregarCatalogoJogos()]);
     } catch (erro) {
       console.error('Erro ao carregar dados da fila:', erro);
       setMensagemModal(erro instanceof Error ? erro.message : 'Não foi possível carregar os dados desta fila.');
     } finally {
       setCarregandoFila(false);
     }
-  }, [carregarParticipantesCadastrados, db, filaId]);
+  }, [carregarParticipantesCadastrados, carregarCatalogoJogos, db, filaId]);
 
   useFocusEffect(useCallback(() => {
     void atualizarTela();
   }, [atualizarTela]));
+
+  useEffect(() => {
+    if (typeof participanteNovoId !== 'string' || !participanteNovoId) return;
+    if (participanteNovoProcessado.current === participanteNovoId) return;
+    participanteNovoProcessado.current = participanteNovoId;
+    let ativo = true;
+    void (async () => {
+      try {
+        const participante = await buscarParticipantePorId(db, participanteNovoId);
+        if (!ativo) return;
+        await carregarCatalogoJogos();
+        if (!participante) {
+          setMensagemModal('O participante foi cadastrado, mas não foi localizado neste dispositivo.');
+          setParticipanteSelecionado(null);
+        } else {
+          setParticipanteSelecionado(participante);
+          setJogoSelecionado(null);
+          setBuscaJogo('');
+          setMensagemModal('Participante cadastrado. Agora escolha o jogo que ele vai utilizar.');
+        }
+        setModalParticipantesVisivel(true);
+      } catch (erro) {
+        if (!ativo) return;
+        setMensagemModal(erro instanceof Error ? erro.message : 'Não foi possível preparar a inclusão na fila.');
+        setModalParticipantesVisivel(true);
+      }
+    })();
+    return () => { ativo = false; };
+  }, [db, participanteNovoId, carregarCatalogoJogos]);
 
   const participantesFiltrados = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase('pt-BR');
@@ -77,6 +124,11 @@ export default function GerenciarFila() {
       participante.nome.toLocaleLowerCase('pt-BR').includes(termo)
     );
   }, [participantesCadastrados, busca]);
+
+  const jogosFiltrados = useMemo(() => {
+    const termo = buscaJogo.trim().toLocaleLowerCase('pt-BR');
+    return catalogoJogos.filter((jogo) => jogo.nome.toLocaleLowerCase('pt-BR').includes(termo));
+  }, [catalogoJogos, buscaJogo]);
 
   if (carregandoFila) {
     return (
@@ -116,25 +168,82 @@ export default function GerenciarFila() {
 
   async function abrirModalParticipantes() {
     setMensagemModal('');
+    setBusca('');
+    setBuscaJogo('');
+    setParticipanteSelecionado(null);
+    setJogoSelecionado(null);
     try {
-      await carregarParticipantesCadastrados();
+      await Promise.all([carregarParticipantesCadastrados(), carregarCatalogoJogos()]);
       setModalParticipantesVisivel(true);
     } catch (erro) {
-      console.error('Erro ao atualizar participantes da fila:', erro);
-      setMensagemModal('Não foi possível carregar os participantes.');
+      console.error('Erro ao atualizar dados para a fila:', erro);
+      setMensagemModal('Não foi possível carregar participantes e jogos.');
       setModalParticipantesVisivel(true);
     }
   }
 
-  async function selecionarParticipante(participante: Participante) {
-    const resultado = await adicionarParticipanteAFila(db, filaAtual.id, participante.id);
+  function selecionarParticipante(participante: Participante) {
+    setParticipanteSelecionado(participante);
+    setJogoSelecionado(null);
+    setBuscaJogo('');
+    setMensagemModal('');
+  }
 
-    if (resultado.sucesso && resultado.fila) {
-      setFila(resultado.fila);
-      setBusca('');
-      setModalParticipantesVisivel(false);
-    } else {
-      setMensagemModal(resultado.mensagem || 'Não foi possível adicionar o participante.');
+  function voltarParaParticipantes() {
+    setParticipanteSelecionado(null);
+    setJogoSelecionado(null);
+    setBuscaJogo('');
+    setMensagemModal('');
+  }
+
+  async function cadastrarESelecionarJogo() {
+    const nomeInformado = buscaJogo.trim();
+    if (!nomeInformado) {
+      setMensagemModal('Digite o nome do jogo.');
+      return;
+    }
+
+    try {
+      const jogoExistente = catalogoJogos.find(
+        (jogo) => jogo.nome.localeCompare(nomeInformado, 'pt-BR', { sensitivity: 'base' }) === 0
+      );
+      const jogo = jogoExistente ?? await obterOuCriarJogoNoCatalogo(db, nomeInformado);
+      await carregarCatalogoJogos();
+      setJogoSelecionado(jogo);
+      setBuscaJogo(jogo.nome);
+      setMensagemModal(jogoExistente ? 'Jogo já cadastrado. Ele foi selecionado.' : 'Jogo salvo no catálogo local. Será sincronizado quando houver internet.');
+    } catch (erro) {
+      setMensagemModal(erro instanceof Error ? erro.message : 'Não foi possível salvar esse jogo.');
+    }
+  }
+
+  async function confirmarAdicionarParticipanteAFila() {
+    if (!participanteSelecionado || !jogoSelecionado || salvandoNaFila) {
+      setMensagemModal('Selecione o participante e o jogo que ele vai utilizar.');
+      return;
+    }
+
+    setSalvandoNaFila(true);
+    setMensagemModal('');
+    try {
+      const resultado = await adicionarParticipanteAFila(
+        db,
+        filaAtual.id,
+        participanteSelecionado.id,
+        jogoSelecionado.id
+      );
+      if (resultado.sucesso && resultado.fila) {
+        setFila(resultado.fila);
+        setBusca('');
+        setBuscaJogo('');
+        setParticipanteSelecionado(null);
+        setJogoSelecionado(null);
+        setModalParticipantesVisivel(false);
+      } else {
+        setMensagemModal(resultado.mensagem || 'Não foi possível adicionar o participante à fila.');
+      }
+    } finally {
+      setSalvandoNaFila(false);
     }
   }
 
@@ -197,7 +306,7 @@ export default function GerenciarFila() {
                 <View style={styles.dadosSenha}>
                   <Text style={styles.numeroSenha}>{participanteAtual.senha}</Text>
                   <Text style={styles.nomeAtendimento}>{participanteAtual.nome}</Text>
-                  <Text style={styles.tipoAtendimento}>{participanteAtual.jogos.join(', ') || 'Atividade não informada'}</Text>
+                  <Text style={styles.tipoAtendimento}>{participanteAtual.jogos.join(', ') || 'Jogo não informado'}</Text>
                 </View>
                 <View style={styles.divisorSenha} />
                 <View style={styles.iconeSenha}><Ionicons name="game-controller" size={38} color={tema.primary} /></View>
@@ -221,6 +330,7 @@ export default function GerenciarFila() {
           <View style={styles.dadosProximo}>
             <Text style={styles.rotuloProximo}>Próximo participante</Text>
             <Text style={styles.nomeProximo}>{proximoParticipante ? `${proximoParticipante.senha} • ${proximoParticipante.nome}` : 'Nenhum participante aguardando'}</Text>
+            {proximoParticipante?.jogos[0] && <Text style={styles.jogoProximo}>{proximoParticipante.jogos[0]}</Text>}
           </View>
         </View>
 
@@ -241,6 +351,7 @@ export default function GerenciarFila() {
                   <View style={styles.dadosParticipante}>
                     <Text style={styles.senhaParticipante}>{participante.senha}</Text>
                     <Text style={styles.nomeParticipante}>{participante.nome}</Text>
+                    <Text style={styles.jogoNaFila}>{participante.jogos[0] || 'Jogo não informado'}</Text>
                   </View>
                   <View style={[styles.badgeStatus, status === 'Atual' && styles.badgeAtual, status === 'Próximo' && styles.badgeProximo, status === 'Atendido' && styles.badgeAtendido]}>
                     <Text style={[styles.textoBadge, status === 'Atendido' && styles.textoAtendido]}>{status}</Text>
@@ -274,38 +385,126 @@ export default function GerenciarFila() {
           <Pressable style={styles.modalFora} onPress={() => setModalParticipantesVisivel(false)} />
           <View style={styles.caixaModal}>
             <View style={styles.modalCabecalho}>
-              <View>
-                <Text style={styles.modalTitulo}>Adicionar participante</Text>
-                <Text style={styles.modalSubtitulo}>Selecione alguém já cadastrado.</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitulo}>{participanteSelecionado ? 'Selecionar jogo' : 'Adicionar participante'}</Text>
+                <Text style={styles.modalSubtitulo}>
+                  {participanteSelecionado
+                    ? 'Escolha o jogo que esta pessoa vai jogar nesta fila.'
+                    : 'Selecione alguém já cadastrado.'}
+                </Text>
               </View>
-              <Pressable onPress={() => setModalParticipantesVisivel(false)} style={styles.fecharModal}><Ionicons name="close" size={22} color={tema.textSecondary} /></Pressable>
+              <Pressable onPress={() => setModalParticipantesVisivel(false)} style={styles.fecharModal}>
+                <Ionicons name="close" size={22} color={tema.textSecondary} />
+              </Pressable>
             </View>
-            <View style={styles.buscaContainer}>
-              <Ionicons name="search" size={19} color={tema.textSecondary} />
-              <TextInput style={styles.campoBusca} placeholder="Buscar participante..." placeholderTextColor={tema.textSecondary} value={busca} onChangeText={setBusca} />
-            </View>
+
             {mensagemModal !== '' && <Text style={styles.mensagemModal}>{mensagemModal}</Text>}
-            <FlatList
-              data={participantesFiltrados}
-              keyExtractor={(item) => `${item.nome}-${item.dataNascimento}`}
-              keyboardShouldPersistTaps="handled"
-              style={styles.listaModal}
-              ListEmptyComponent={<Text style={styles.listaModalVazia}>{busca ? 'Nenhum participante encontrado.' : 'Nenhum participante cadastrado ainda.'}</Text>}
-              renderItem={({ item }) => (
-                <Pressable style={styles.itemModal} onPress={() => selecionarParticipante(item)}>
-                  <View style={styles.avatarModal}><Text style={styles.iniciais}>{obterIniciais(item.nome)}</Text></View>
-                  <View style={styles.dadosItemModal}>
-                    <Text style={styles.nomeItemModal}>{item.nome}</Text>
-                    <Text style={styles.jogosItemModal}>{item.jogos.join(', ') || 'Sem jogos informados'}</Text>
-                  </View>
-                  <Ionicons name="add-circle" size={24} color={tema.primary} />
+
+            {!participanteSelecionado ? (
+              <>
+                <View style={styles.buscaContainer}>
+                  <Ionicons name="search" size={19} color={tema.textSecondary} />
+                  <TextInput
+                    style={styles.campoBusca}
+                    placeholder="Buscar participante..."
+                    placeholderTextColor={tema.textSecondary}
+                    value={busca}
+                    onChangeText={setBusca}
+                  />
+                </View>
+                <FlatList
+                  data={participantesFiltrados}
+                  keyExtractor={(item) => item.id}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.listaModal}
+                  ListEmptyComponent={<Text style={styles.listaModalVazia}>{busca ? 'Nenhum participante encontrado.' : 'Nenhum participante cadastrado ainda.'}</Text>}
+                  renderItem={({ item }) => (
+                    <Pressable style={styles.itemModal} onPress={() => selecionarParticipante(item)}>
+                      <View style={styles.avatarModal}><Text style={styles.iniciais}>{obterIniciais(item.nome)}</Text></View>
+                      <View style={styles.dadosItemModal}>
+                        <Text style={styles.nomeItemModal}>{item.nome}</Text>
+                        <Text style={styles.jogosItemModal}>{item.jogos.join(', ') || 'Sem jogos de interesse informados'}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward-circle" size={24} color={tema.primary} />
+                    </Pressable>
+                  )}
+                />
+                <Pressable style={styles.botaoNaoCadastrado} onPress={abrirCadastroParticipante}>
+                  <Ionicons name="person-add-outline" size={19} color={tema.primary} />
+                  <Text style={styles.textoNaoCadastrado}>Participante não cadastrado?</Text>
                 </Pressable>
-              )}
-            />
-            <Pressable style={styles.botaoNaoCadastrado} onPress={abrirCadastroParticipante}>
-              <Ionicons name="person-add-outline" size={19} color={tema.primary} />
-              <Text style={styles.textoNaoCadastrado}>Participante não cadastrado?</Text>
-            </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.participanteSelecionadoCard}>
+                  <View style={styles.avatarModal}><Text style={styles.iniciais}>{obterIniciais(participanteSelecionado.nome)}</Text></View>
+                  <View style={styles.dadosItemModal}>
+                    <Text style={styles.nomeItemModal}>{participanteSelecionado.nome}</Text>
+                    <Text style={styles.modalSubtitulo}>Participante selecionado</Text>
+                  </View>
+                  <Pressable onPress={voltarParaParticipantes} style={styles.botaoVoltarParticipantes}>
+                    <Text style={styles.textoVoltarParticipantes}>Trocar</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.buscaContainer}>
+                  <Ionicons name="game-controller-outline" size={19} color={tema.textSecondary} />
+                  <TextInput
+                    style={styles.campoBusca}
+                    placeholder="Buscar ou digitar o nome do jogo..."
+                    placeholderTextColor={tema.textSecondary}
+                    value={buscaJogo}
+                    onChangeText={(valor) => { setBuscaJogo(valor); setJogoSelecionado(null); setMensagemModal(''); }}
+                  />
+                </View>
+
+                <FlatList
+                  data={jogosFiltrados}
+                  keyExtractor={(item) => item.id}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.listaModal}
+                  ListEmptyComponent={<Text style={styles.listaModalVazia}>Nenhum jogo encontrado. Digite o nome acima para cadastrá-lo.</Text>}
+                  renderItem={({ item }) => {
+                    const selecionado = jogoSelecionado?.id === item.id;
+                    return (
+                      <Pressable
+                        style={[styles.itemModal, selecionado && styles.itemJogoSelecionado]}
+                        onPress={() => { setJogoSelecionado(item); setBuscaJogo(item.nome); setMensagemModal(''); }}
+                      >
+                        <View style={styles.iconeJogoModal}>
+                          <Ionicons name="game-controller-outline" size={20} color={tema.primary} />
+                        </View>
+                        <View style={styles.dadosItemModal}>
+                          <Text style={styles.nomeItemModal}>{item.nome}</Text>
+                        </View>
+                        <Ionicons name={selecionado ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={tema.primary} />
+                      </Pressable>
+                    );
+                  }}
+                />
+
+                {buscaJogo.trim() !== '' && !catalogoJogos.some(
+                  (jogo) => jogo.nome.localeCompare(buscaJogo.trim(), 'pt-BR', { sensitivity: 'base' }) === 0
+                ) && (
+                  <Pressable style={styles.botaoCadastrarJogo} onPress={() => void cadastrarESelecionarJogo()}>
+                    <Ionicons name="add-circle-outline" size={20} color={tema.primary} />
+                    <Text style={styles.textoBotaoCadastrarJogo}>Cadastrar e selecionar “{buscaJogo.trim()}”</Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  style={[styles.botaoConfirmarFila, (!jogoSelecionado || salvandoNaFila) && styles.botaoConfirmarFilaDesabilitado]}
+                  onPress={() => void confirmarAdicionarParticipanteAFila()}
+                  disabled={!jogoSelecionado || salvandoNaFila}
+                >
+                  <Ionicons name="person-add" size={19} color="#FFFFFF" />
+                  <Text style={styles.textoBotaoConfirmarFila}>{salvandoNaFila ? 'Adicionando...' : 'Adicionar à fila'}</Text>
+                </Pressable>
+                <Pressable style={styles.botaoCancelarSelecao} onPress={() => setModalParticipantesVisivel(false)}>
+                  <Text style={styles.textoBotaoCancelarSelecao}>Cancelar</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -361,6 +560,7 @@ const estilosBase = StyleSheet.create({
   dadosProximo: { flex: 1 },
   rotuloProximo: { color: '#777777', fontSize: 12, marginBottom: 4 },
   nomeProximo: { color: '#222222', fontSize: 14, fontWeight: 'bold' },
+  jogoProximo: { color: '#777777', fontSize: 12, marginTop: 3 },
   tituloLista: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   contador: { backgroundColor: '#8000FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   textoContador: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
@@ -371,6 +571,7 @@ const estilosBase = StyleSheet.create({
   dadosParticipante: { flex: 1 },
   senhaParticipante: { color: '#222222', fontSize: 13, fontWeight: 'bold' },
   nomeParticipante: { color: '#777777', fontSize: 12, marginTop: 2 },
+  jogoNaFila: { color: '#8A63B8', fontSize: 11, marginTop: 3 },
   divisorLista: { height: 1, backgroundColor: '#EEEEEE' },
   badgeStatus: { backgroundColor: '#EEEEEE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   badgeAtual: { backgroundColor: '#8000FF' },
@@ -410,6 +611,18 @@ const estilosBase = StyleSheet.create({
   mensagemModal: { color: '#D92D45', fontSize: 12, marginBottom: 8 },
   botaoNaoCadastrado: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, marginTop: 10, backgroundColor: '#F1E8FF', borderRadius: 11 },
   textoNaoCadastrado: { color: '#6500CC', fontWeight: 'bold', fontSize: 13 },
+  participanteSelecionadoCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F7F2FF', padding: 10, borderRadius: 12, marginBottom: 12 },
+  botaoVoltarParticipantes: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9, backgroundColor: '#FFFFFF' },
+  textoVoltarParticipantes: { color: '#8000FF', fontWeight: 'bold', fontSize: 12 },
+  iconeJogoModal: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F1E8FF', alignItems: 'center', justifyContent: 'center' },
+  itemJogoSelecionado: { backgroundColor: '#F1E8FF', borderRadius: 10, paddingHorizontal: 8 },
+  botaoCadastrarJogo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 10, backgroundColor: '#F1E8FF', marginTop: 8 },
+  textoBotaoCadastrarJogo: { color: '#6500CC', fontSize: 13, fontWeight: 'bold', flexShrink: 1, textAlign: 'center' },
+  botaoConfirmarFila: { backgroundColor: '#8000FF', borderRadius: 11, paddingVertical: 14, marginTop: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  botaoConfirmarFilaDesabilitado: { backgroundColor: '#BCA0D9', opacity: 0.65 },
+  textoBotaoConfirmarFila: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
+  botaoCancelarSelecao: { alignItems: 'center', paddingVertical: 10 },
+  textoBotaoCancelarSelecao: { color: '#777777', fontSize: 13, fontWeight: '600' },
   fundoConfirmacao: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 22 },
   caixaConfirmacao: { width: '100%', maxWidth: 420, backgroundColor: '#FFF', borderRadius: 18, padding: 22, alignItems: 'center' },
   iconeConfirmacao: { width: 55, height: 55, borderRadius: 28, backgroundColor: '#FDE7EA', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

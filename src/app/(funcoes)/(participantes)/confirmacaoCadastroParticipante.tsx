@@ -53,7 +53,10 @@ export default function ConfirmacaoCadastro() {
 
   function voltar() {
     if (veioDaFila && params.filaId) {
-      router.replace({ pathname: '/filas/gerenciarfilas', params: { filaId: params.filaId } });
+      router.replace({
+        pathname: '/filas/gerenciarfilas',
+        params: { filaId: params.filaId, participanteNovoId: params.participantId || '' },
+      });
     } else if (typeof params.eventId === 'string' && params.eventId) {
       router.replace({ pathname: '/participantescadastrados', params: { eventId: params.eventId } });
     } else {
@@ -74,7 +77,7 @@ export default function ConfirmacaoCadastro() {
       <View style={styles.container}>
         <Text style={{ color: tema.text }}>Não foi possível localizar o participante salvo.</Text>
         <Pressable style={styles.botao} onPress={voltar}>
-          <Text style={styles.textoBotao}>{veioDaFila ? 'Voltar para filas' : 'Voltar para participantes'}</Text>
+          <Text style={styles.textoBotao}>{veioDaFila ? 'Escolher jogo e adicionar à fila' : 'Voltar para participantes'}</Text>
         </Pressable>
       </View>
     );
@@ -86,7 +89,7 @@ export default function ConfirmacaoCadastro() {
     <View style={styles.container}>
       <View style={styles.iconeSucesso}><Text style={styles.check}>✓</Text></View>
       <Text style={styles.titulo}>Participante cadastrado com sucesso!</Text>
-      <Text style={styles.descricao}>Confira as informações registradas:</Text>
+      <Text style={styles.descricao}>{veioDaFila ? 'Cadastro salvo. Ao continuar, escolha o jogo que ele vai utilizar na fila.' : 'Confira as informações registradas:'}</Text>
 
       {typeof params.queueError === 'string' && params.queueError !== '' && (
         <View style={styles.avisoFila}>
@@ -106,7 +109,7 @@ export default function ConfirmacaoCadastro() {
       </View>
 
       <Pressable style={styles.botao} onPress={voltar}>
-        <Text style={styles.textoBotao}>{veioDaFila ? 'Voltar para filas' : 'Voltar para a lista de participantes'}</Text>
+        <Text style={styles.textoBotao}>{veioDaFila ? 'Escolher jogo e adicionar à fila' : 'Voltar para a lista de participantes'}</Text>
       </Pressable>
     </View>
   );

@@ -13,7 +13,8 @@ type TipoEntidade =
   | 'event_day'
   | 'event_participant_day'
   | 'event_feedback'
-  | 'event_feedback_game_suggestion';
+  | 'event_feedback_game_suggestion'
+  | 'event_game_play';
 
 type OperacaoOutbox = 'upsert' | 'delete';
 
@@ -46,6 +47,7 @@ const DESTINOS: Record<TipoEntidade, Destino> = {
   event_participant_day: { tabela: 'event_participant_days', conflito: 'id', chavesDelete: ['id'] },
   event_feedback: { tabela: 'event_feedback', conflito: 'id', chavesDelete: ['id'] },
   event_feedback_game_suggestion: { tabela: 'event_feedback_game_suggestions', conflito: 'id', chavesDelete: ['id'] },
+  event_game_play: { tabela: 'event_game_plays', conflito: 'id', chavesDelete: ['id'] },
 };
 
 /** Define exatamente quais colunas são copiadas do PostgreSQL para o SQLite. */
@@ -103,7 +105,7 @@ const DOWNLOADS: ConfiguracaoDownload[] = [
   },
   {
     tipo: 'queue_entry', tabela: 'queue_entries',
-    colunas: ['id', 'queue_id', 'event_participant_id', 'ticket_number', 'sequence_number', 'status', 'added_at', 'called_at'],
+    colunas: ['id', 'queue_id', 'event_participant_id', 'event_day_id', 'game_id', 'ticket_number', 'sequence_number', 'status', 'added_at', 'called_at'],
     chaves: ['id'], ordenarPor: ['id'], entityId: (r) => String(r.id),
   },
   {
@@ -119,6 +121,11 @@ const DOWNLOADS: ConfiguracaoDownload[] = [
   {
     tipo: 'event_feedback_game_suggestion', tabela: 'event_feedback_game_suggestions',
     colunas: ['id', 'feedback_id', 'game_name', 'game_name_normalized', 'created_at'],
+    chaves: ['id'], ordenarPor: ['id'], entityId: (r) => String(r.id),
+  },
+  {
+    tipo: 'event_game_play', tabela: 'event_game_plays',
+    colunas: ['id', 'event_id', 'event_day_id', 'event_participant_id', 'game_id', 'created_at', 'updated_at'],
     chaves: ['id'], ordenarPor: ['id'], entityId: (r) => String(r.id),
   },
 ];
@@ -219,6 +226,7 @@ function prioridadeEntidade(tipo: TipoEntidade): number {
     event_participant_day: 60,
     event_feedback: 60,
     event_feedback_game_suggestion: 70,
+    event_game_play: 70,
   };
   return prioridades[tipo];
 }

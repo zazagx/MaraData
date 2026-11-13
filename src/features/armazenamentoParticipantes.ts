@@ -127,12 +127,39 @@ export async function adicionarJogo(
   return nomeResultado;
 }
 
+export type JogoCatalogo = { id: string; nome: string };
+
+/** Lista o catálogo local com identificadores, inclusive jogos criados offline. */
+export async function buscarCatalogoJogos(db: SQLiteDatabase): Promise<JogoCatalogo[]> {
+  return db.getAllAsync<JogoCatalogo>(
+    `SELECT id, nome FROM games ORDER BY nome COLLATE NOCASE ASC`
+  );
+}
+
+/** Localiza ou cria um jogo no catálogo local e registra a criação na sync_outbox. */
+export async function obterOuCriarJogoNoCatalogo(
+  db: SQLiteDatabase,
+  nome: string
+): Promise<JogoCatalogo> {
+  const nomeNormalizado = normalizarNome(nome.trim().replace(/\s+/g, ' '));
+  if (!nomeNormalizado) throw new Error('O nome do jogo não pode ficar vazio.');
+
+  await db.withTransactionAsync(async () => {
+    await obterOuCriarJogo(db, nome);
+  });
+
+  const jogoSalvo = await db.getFirstAsync<JogoRow>(
+    `SELECT id, nome, nome_normalizado, created_at, updated_at
+       FROM games WHERE nome_normalizado = ?`,
+    nomeNormalizado
+  );
+  if (!jogoSalvo) throw new Error('Não foi possível salvar o jogo no catálogo.');
+  return { id: jogoSalvo.id, nome: jogoSalvo.nome };
+}
+
 /** Lista o catálogo persistido, inicialmente vazio. */
 export async function buscarJogos(db: SQLiteDatabase): Promise<string[]> {
-  const jogos = await db.getAllAsync<Pick<JogoRow, 'nome'>>(
-    `SELECT nome FROM games ORDER BY nome COLLATE NOCASE ASC`
-  );
-
+  const jogos = await buscarCatalogoJogos(db);
   return jogos.map((jogo) => jogo.nome);
 }
 

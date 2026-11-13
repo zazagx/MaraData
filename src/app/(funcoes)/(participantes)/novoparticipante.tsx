@@ -11,7 +11,6 @@ import { useEstilosTema } from '../../../context/temaEstilos';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
-import { adicionarParticipanteAFila } from '../../../features/armazenamentofilas';
 import { registrarParticipanteNoEvento } from '../../../features/armazenamentoEvento';
 import { useLocalSearchParams } from 'expo-router';
 import {
@@ -523,18 +522,9 @@ if (!temErro && !salvando) {
 
     let erroAoAdicionarNaFila = '';
 
-    // Se o cadastro começou pelo gerenciamento de uma fila, cria também
-    // o vínculo do participante com o evento e com a fila no SQLite.
-    if (params.origem === 'fila' && typeof params.filaId === 'string') {
-      const resultadoFila = await adicionarParticipanteAFila(
-        db,
-        params.filaId,
-        participanteCriado.id
-      );
-      if (!resultadoFila.sucesso) {
-        erroAoAdicionarNaFila = resultadoFila.mensagem || 'O participante foi salvo, mas não entrou na fila.';
-      }
-    } else if (typeof params.eventId === 'string' && params.eventId) {
+    // Quando o cadastro começa por uma fila, a entrada só será criada depois
+    // que o usuário retornar e selecionar o jogo efetivamente utilizado.
+    if (params.origem !== 'fila' && typeof params.eventId === 'string' && params.eventId) {
       try {
         await registrarParticipanteNoEvento(db, params.eventId, participanteCriado.id);
       } catch (erroVinculo) {

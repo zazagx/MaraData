@@ -55,16 +55,12 @@ type ParticipanteFilaRow = {
   status: StatusParticipanteFila;
   added_at: string;
   called_at: string | null;
-};
-
-type JogoFilaRow = {
-  event_participant_id: string;
-  nome: string;
+  jogo_nome: string | null;
 };
 
 async function registrarOutbox(
   db: SQLiteDatabase,
-  entityType: 'event_queue' | 'event_participant' | 'event_participant_game' | 'queue_entry',
+  entityType: 'event_queue' | 'event_participant' | 'event_participant_game' | 'queue_entry' | 'event_game_play',
   entityId: string,
   payload: Record<string, unknown>
 ): Promise<void> {
@@ -102,33 +98,15 @@ async function montarFila(db: SQLiteDatabase, row: FilaRow): Promise<Fila> {
        qe.ticket_number,
        qe.status,
        qe.added_at,
-       qe.called_at
+       qe.called_at,
+       g.nome AS jogo_nome
      FROM queue_entries qe
      INNER JOIN event_participants ep ON ep.id = qe.event_participant_id
+     LEFT JOIN games g ON g.id = qe.game_id
      WHERE qe.queue_id = ?
      ORDER BY qe.sequence_number ASC`,
     row.id
   );
-
-  const jogosRows = participantesRows.length > 0
-    ? await db.getAllAsync<JogoFilaRow>(
-        `SELECT epg.event_participant_id, g.nome
-           FROM event_participant_games epg
-           INNER JOIN games g ON g.id = epg.game_id
-          WHERE epg.event_participant_id IN (
-            SELECT event_participant_id FROM queue_entries WHERE queue_id = ?
-          )
-          ORDER BY g.nome COLLATE NOCASE ASC`,
-        row.id
-      )
-    : [];
-
-  const jogosPorInscricao = new Map<string, string[]>();
-  for (const jogo of jogosRows) {
-    const atual = jogosPorInscricao.get(jogo.event_participant_id) ?? [];
-    atual.push(jogo.nome);
-    jogosPorInscricao.set(jogo.event_participant_id, atual);
-  }
 
   const participantes: ParticipanteNaFila[] = participantesRows.map((item) => ({
     id: item.entry_id,
@@ -137,7 +115,7 @@ async function montarFila(db: SQLiteDatabase, row: FilaRow): Promise<Fila> {
     nome: item.nome,
     dataNascimento: item.data_nascimento,
     senha: item.ticket_number,
-    jogos: jogosPorInscricao.get(item.event_participant_id) ?? [],
+    jogos: item.jogo_nome ? [item.jogo_nome] : [],
     status: item.status,
     adicionadoEm: item.added_at,
     chamadoEm: item.called_at ?? undefined,
@@ -239,7 +217,8 @@ export async function salvarFila(
 export async function adicionarParticipanteAFila(
   db: SQLiteDatabase,
   filaId: string,
-  participantId: string
+  participantId: string,
+  gameId: string
 ): Promise<{ sucesso: boolean; mensagem?: string; fila?: Fila }> {
   try {
     const filaAntes = await buscarFilaRow(db, filaId);
@@ -248,6 +227,18 @@ export async function adicionarParticipanteAFila(
     if (filaAntes.situacao_evento !== 'em_andamento') {
       throw new Error('O evento desta fila não está mais em andamento.');
     }
+    if (!gameId) throw new Error('Selecione o jogo que o participante vai jogar.');
+
+    const jogoSelecionado = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM games WHERE id = ?', gameId
+    );
+    if (!jogoSelecionado) throw new Error('O jogo selecionado não existe no catálogo deste dispositivo.');
+
+    const diaAtivoAntes = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM event_days WHERE event_id = ? AND status = 'em_andamento' LIMIT 1`,
+      filaAntes.event_id
+    );
+    if (!diaAtivoAntes) throw new Error('Não há um dia em andamento neste evento. Inicie o dia antes de adicionar participantes à fila.');
 
     // Garante que o participante pertença ao evento, criando um snapshot
     // demográfico e dos jogos na primeira inscrição.
@@ -258,6 +249,11 @@ export async function adicionarParticipanteAFila(
       if (!filaAtual || filaAtual.status !== 'ativa' || filaAtual.situacao_evento !== 'em_andamento') {
         throw new Error('A fila ou o evento foi encerrado antes de concluir a inscrição.');
       }
+      const diaAtivo = await db.getFirstAsync<{ id: string }>(
+        `SELECT id FROM event_days WHERE event_id = ? AND status = 'em_andamento' LIMIT 1`,
+        filaAtual.event_id
+      );
+      if (!diaAtivo) throw new Error('O dia do evento foi encerrado. Inicie o próximo dia antes de adicionar participantes.');
 
       const existenteNaFila = await db.getFirstAsync<{ id: string }>(
         'SELECT id FROM queue_entries WHERE queue_id = ? AND event_participant_id = ?',
@@ -279,6 +275,8 @@ export async function adicionarParticipanteAFila(
         id: entryId,
         queue_id: filaId,
         event_participant_id: inscricao.eventParticipantId,
+        event_day_id: diaAtivo.id,
+        game_id: gameId,
         ticket_number: senha,
         sequence_number: numero,
         status: 'aguardando',
@@ -288,12 +286,14 @@ export async function adicionarParticipanteAFila(
 
       await db.runAsync(
         `INSERT INTO queue_entries (
-          id, queue_id, event_participant_id, ticket_number,
+          id, queue_id, event_participant_id, event_day_id, game_id, ticket_number,
           sequence_number, status, added_at, called_at
-        ) VALUES (?, ?, ?, ?, ?, 'aguardando', ?, NULL)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'aguardando', ?, NULL)`,
         entryId,
         filaId,
         inscricao.eventParticipantId,
+        diaAtivo.id,
+        gameId,
         senha,
         numero,
         addedAt
@@ -326,11 +326,13 @@ export async function avancarSenha(
         id: string;
         queue_id: string;
         event_participant_id: string;
+        event_day_id: string | null;
+        game_id: string | null;
         ticket_number: string;
         sequence_number: number;
         added_at: string;
       }>(
-        `SELECT id, queue_id, event_participant_id, ticket_number, sequence_number, added_at
+        `SELECT id, queue_id, event_participant_id, event_day_id, game_id, ticket_number, sequence_number, added_at
            FROM queue_entries
           WHERE queue_id = ? AND status = 'aguardando'
           ORDER BY sequence_number ASC LIMIT 1`,
@@ -348,12 +350,53 @@ export async function avancarSenha(
         id: atual.id,
         queue_id: atual.queue_id,
         event_participant_id: atual.event_participant_id,
+        event_day_id: atual.event_day_id,
+        game_id: atual.game_id,
         ticket_number: atual.ticket_number,
         sequence_number: atual.sequence_number,
         status: 'atendido',
         added_at: atual.added_at,
         called_at: chamadoEm,
       });
+
+      // Só contamos como jogo efetivamente utilizado quando a senha é marcada como atendida.
+      if (atual.game_id && atual.event_day_id) {
+        const jogoJaRegistrado = await db.getFirstAsync<{ id: string }>(
+          `SELECT id FROM event_game_plays
+            WHERE event_day_id = ? AND event_participant_id = ? AND game_id = ?`,
+          atual.event_day_id, atual.event_participant_id, atual.game_id
+        );
+        if (!jogoJaRegistrado) {
+          const eventoDaFila = await db.getFirstAsync<{ event_id: string }>(
+            'SELECT event_id FROM event_queues WHERE id = ?', atual.queue_id
+          );
+          if (!eventoDaFila) throw new Error('Não foi possível identificar o evento desta entrada de fila.');
+          const registroJogoId = criarId('event_game_play');
+          const agoraJogo = new Date().toISOString();
+          const payloadJogo = {
+            id: registroJogoId,
+            event_id: eventoDaFila.event_id,
+            event_day_id: atual.event_day_id,
+            event_participant_id: atual.event_participant_id,
+            game_id: atual.game_id,
+            created_at: agoraJogo,
+            updated_at: agoraJogo,
+          };
+          await db.runAsync(
+            `INSERT INTO event_game_plays
+              (id, event_id, event_day_id, event_participant_id, game_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            registroJogoId,
+            eventoDaFila.event_id,
+            atual.event_day_id,
+            atual.event_participant_id,
+            atual.game_id,
+            agoraJogo,
+            agoraJogo
+          );
+          await registrarOutbox(db, 'event_game_play', registroJogoId, payloadJogo);
+        }
+      }
     });
 
     return { sucesso: true, fila: await buscarFilaPorId(db, filaId) };

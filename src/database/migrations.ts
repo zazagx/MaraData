@@ -4,7 +4,6 @@ import type { SQLiteDatabase } from 'expo-sqlite';
  * Estrutura local do MaraData.
  * O SQLite é a fonte de verdade durante o trabalho offline.
  */
-const VERSAO_BANCO = 3;
 
 const MIGRACAO_1 = `
 CREATE TABLE IF NOT EXISTS participants (
@@ -230,6 +229,82 @@ CREATE INDEX IF NOT EXISTS idx_feedback_suggestions_name
   ON event_feedback_game_suggestions(game_name_normalized);
 `;
 
+
+const MIGRACAO_4 = `
+-- Registros explícitos dos jogos que cada participante efetivamente utilizou.
+CREATE TABLE IF NOT EXISTS event_game_plays (
+  id TEXT PRIMARY KEY NOT NULL,
+  event_id TEXT NOT NULL,
+  event_day_id TEXT NOT NULL,
+  event_participant_id TEXT NOT NULL,
+  game_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (event_day_id, event_participant_id, game_id),
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  FOREIGN KEY (event_day_id) REFERENCES event_days(id) ON DELETE CASCADE,
+  FOREIGN KEY (event_participant_id) REFERENCES event_participants(id) ON DELETE CASCADE,
+  FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_event_game_plays_event ON event_game_plays(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_game_plays_day ON event_game_plays(event_day_id);
+CREATE INDEX IF NOT EXISTS idx_event_game_plays_game ON event_game_plays(game_id);
+CREATE INDEX IF NOT EXISTS idx_event_game_plays_participant ON event_game_plays(event_participant_id);
+
+-- Amplia os tipos aceitos pela fila de sincronização preservando pendências antigas.
+DROP INDEX IF EXISTS idx_sync_outbox_created;
+ALTER TABLE sync_outbox RENAME TO sync_outbox_v3;
+CREATE TABLE sync_outbox (
+  id TEXT PRIMARY KEY NOT NULL,
+  entity_type TEXT NOT NULL CHECK (entity_type IN (
+    'participant', 'game', 'participant_game', 'event',
+    'event_participant', 'event_participant_game', 'event_queue', 'queue_entry',
+    'event_day', 'event_participant_day', 'event_feedback',
+    'event_feedback_game_suggestion', 'event_game_play'
+  )),
+  entity_id TEXT NOT NULL,
+  operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT
+);
+INSERT INTO sync_outbox (id, entity_type, entity_id, operation, payload_json, created_at, attempts, last_error)
+SELECT id, entity_type, entity_id, operation, payload_json, created_at, attempts, last_error
+FROM sync_outbox_v3;
+DROP TABLE sync_outbox_v3;
+CREATE INDEX IF NOT EXISTS idx_sync_outbox_created ON sync_outbox(created_at, id);
+
+CREATE TRIGGER IF NOT EXISTS trg_event_game_play_same_event
+BEFORE INSERT ON event_game_plays
+WHEN (SELECT event_id FROM event_days WHERE id = NEW.event_day_id) != NEW.event_id
+  OR (SELECT event_id FROM event_participants WHERE id = NEW.event_participant_id) != NEW.event_id
+BEGIN
+  SELECT RAISE(ABORT, 'O jogo, o dia e o participante precisam pertencer ao mesmo evento.');
+END;
+`;
+
+
+const MIGRACAO_5 = `
+-- Cada entrada de fila guarda o jogo efetivamente escolhido para aquele atendimento.
+ALTER TABLE queue_entries ADD COLUMN event_day_id TEXT REFERENCES event_days(id) ON DELETE RESTRICT;
+ALTER TABLE queue_entries ADD COLUMN game_id TEXT REFERENCES games(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_queue_entries_day ON queue_entries(event_day_id);
+CREATE INDEX IF NOT EXISTS idx_queue_entries_game ON queue_entries(game_id);
+CREATE TRIGGER IF NOT EXISTS trg_queue_entry_same_event_day
+BEFORE INSERT ON queue_entries
+WHEN NEW.event_day_id IS NOT NULL AND (
+  (SELECT event_id FROM event_days WHERE id = NEW.event_day_id) !=
+    (SELECT event_id FROM event_queues WHERE id = NEW.queue_id)
+  OR
+  (SELECT event_id FROM event_participants WHERE id = NEW.event_participant_id) !=
+    (SELECT event_id FROM event_queues WHERE id = NEW.queue_id)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'A fila, o dia e o participante precisam pertencer ao mesmo evento.');
+END;
+`;
+
 function converterParaISO(data: string): string | null {
   const valor = data.trim();
   const br = valor.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -373,6 +448,23 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
       await db.execAsync(MIGRACAO_3);
       await db.execAsync('PRAGMA user_version = 3;');
     });
+    versao = 3;
+  }
+
+  if (versao < 4) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRACAO_4);
+      await db.execAsync('PRAGMA user_version = 4;');
+    });
+    versao = 4;
+  }
+
+  if (versao < 5) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRACAO_5);
+      await db.execAsync('PRAGMA user_version = 5;');
+    });
+    versao = 5;
   }
 
   await preencherDiasDeEventosExistentes(db);

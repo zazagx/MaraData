@@ -106,7 +106,7 @@ export default function DetalhesEvento() {
         params: { eventId: eventId || '', nomeEvento, localEvento, situacao },
       });
     } else if (tela === 'estatisticas') {
-      router.push('/(funcoes)/estatistica');
+      router.push({ pathname: '/(funcoes)/estatistica', params: { eventId: eventId || '' } });
     }
   };
 
@@ -305,6 +305,8 @@ export default function DetalhesEvento() {
               </View>
               <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
             </TouchableOpacity>
+
+            
 
             <TouchableOpacity
               style={styles.quickAccessCard}
