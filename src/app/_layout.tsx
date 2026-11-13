@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Drawer } from "expo-router/drawer";
 import { SQLiteProvider } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
-
 import {
+  ActivityIndicator,
   Image,
   StyleSheet,
   Text,
@@ -12,15 +12,33 @@ import {
 } from "react-native";
 
 import { EventProvider } from "../context/eventocontexto";
+import { AutenticacaoProvider, useAutenticacao } from "../context/autenticacaoContexto";
+import TelaLogin from "../components/TelaLogin";
+import SincronizacaoAutomatica from "../components/SincronizacaoAutomatica";
 import { TemaProvider, useTema } from "../context/temaContexto";
 import { migrateDbIfNeeded } from "../database/migrations";
 
 // Componente responsável pela navegação
 function ConteudoLayout() {
   const { tema, modoEscuro, alternarTema } = useTema();
+  const { sessao, carregandoAutenticacao, entrar } = useAutenticacao();
+
+  if (carregandoAutenticacao) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: tema.background }}>
+        <ActivityIndicator size="large" color={tema.primary} />
+        <Text style={{ color: tema.textSecondary, marginTop: 12 }}>Verificando acesso...</Text>
+      </View>
+    );
+  }
+
+  if (!sessao) {
+    return <TelaLogin onEntrar={entrar} />;
+  }
 
   return (
     <>
+      <SincronizacaoAutomatica />
       <StatusBar style={modoEscuro ? "light" : "dark"} />
 
       <Drawer
@@ -133,9 +151,11 @@ export default function RootLayout() {
       onInit={migrateDbIfNeeded}
     >
       <TemaProvider>
-        <EventProvider>
-          <ConteudoLayout />
-        </EventProvider>
+        <AutenticacaoProvider>
+          <EventProvider>
+            <ConteudoLayout />
+          </EventProvider>
+        </AutenticacaoProvider>
       </TemaProvider>
     </SQLiteProvider>
   );
