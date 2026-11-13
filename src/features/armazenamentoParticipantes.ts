@@ -284,6 +284,7 @@ export async function buscarParticipantes(
   }));
 }
 
+
 /** Busca um único participante pelo identificador persistido. */
 export async function buscarParticipantePorId(
   db: SQLiteDatabase,
