@@ -249,8 +249,39 @@ async function prepararPayload(
     if (payload.used_queue !== undefined) payload.used_queue = Boolean(payload.used_queue);
   }
 
-  if (registro.entity_type === 'event' && payload.details_downloaded !== undefined) {
-    payload.details_downloaded = Boolean(payload.details_downloaded);
+ if (registro.entity_type === 'event') {
+    if (payload.details_downloaded !== undefined) {
+      payload.details_downloaded = Boolean(payload.details_downloaded);
+    }
+    // Sempre usa o estado mais atual do evento no SQLite (evita travar em versão antiga da outbox)
+    const eventoAtual = await db.getFirstAsync<{ situacao: string; encerrado_em: string | null; updated_at: string }>(
+      'SELECT situacao, encerrado_em, updated_at FROM events WHERE id = ?',
+      registro.entity_id
+    );
+    if (eventoAtual) {
+      payload.situacao = eventoAtual.situacao;
+      payload.encerrado_em = eventoAtual.encerrado_em;
+      payload.updated_at = eventoAtual.updated_at;
+    }
+    // Se ainda estiver 'em_andamento' mas o Supabase já tiver outro evento ativo, encerra o antigo para não travar a fila
+    if (payload.situacao === 'em_andamento' && supabase) {
+      const { data: ativoRemoto } = await supabase
+        .from('events')
+        .select('id')
+        .eq('situacao', 'em_andamento')
+        .maybeSingle();
+
+      if (ativoRemoto && ativoRemoto.id !== registro.entity_id) {
+        const agora = new Date().toISOString();
+        payload.situacao = 'encerrado';
+        payload.encerrado_em ??= agora;
+        await db.runAsync(
+          "UPDATE events SET situacao = 'encerrado', encerrado_em = COALESCE(encerrado_em, ?) WHERE id = ?",
+          agora,
+          registro.entity_id
+        );
+      }
+    }
   }
 
   if (registro.entity_type === 'event_day') {
