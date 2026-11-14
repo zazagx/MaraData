@@ -505,7 +505,7 @@ export default function EstatisticaScreen() {
             </ScrollView>
           </Pressable>
         </Pressable>
-      </Modal>
+      </Modal>' '
     </SafeAreaView>
   );
 }
