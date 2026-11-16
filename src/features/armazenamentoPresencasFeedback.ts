@@ -164,8 +164,11 @@ export async function sincronizarDiasDoEventoNoBanco(
   if (datasExistentes.length === 0 || mudouIntervalo) {
     for (let indice = 0; indice < datasDesejadas.length; indice += 1) {
       const agora = new Date().toISOString();
+      // ID determinístico: dispositivos diferentes geram o mesmo ID para
+      // o mesmo dia do mesmo evento, mesmo que trabalhem offline.
+      const idDia = `event_day_${event.id}_${datasDesejadas[indice]}`;
       const dia: DiaEvento = {
-        id: criarId('event_day'),
+        id: idDia,
         eventId: event.id,
         numero: indice + 1,
         data: datasDesejadas[indice],
