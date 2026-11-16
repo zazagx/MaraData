@@ -33,7 +33,6 @@ type Destino = {
   chavesDelete: string[];
 };
 
-// Os nomes correspondem às tabelas PostgreSQL criadas no projeto Supabase.
 const DESTINOS: Record<TipoEntidade, Destino> = {
   participant: { tabela: 'participants', conflito: 'id', chavesDelete: ['id'] },
   game: { tabela: 'games', conflito: 'id', chavesDelete: ['id'] },
@@ -50,7 +49,6 @@ const DESTINOS: Record<TipoEntidade, Destino> = {
   event_game_play: { tabela: 'event_game_plays', conflito: 'id', chavesDelete: ['id'] },
 };
 
-/** Define exatamente quais colunas são copiadas do PostgreSQL para o SQLite. */
 type ConfiguracaoDownload = {
   tipo: TipoEntidade;
   tabela: string;
@@ -140,6 +138,103 @@ function mensagemErro(erro: unknown): string {
   return String(erro);
 }
 
+/**
+ * Unifica um jogo criado offline com o jogo equivalente já existente no Supabase,
+ * respeitando as restrições ON DELETE RESTRICT e UNIQUE do SQLite local.
+ */
+async function unificarJogoLocalComRemoto(
+  db: SQLiteDatabase,
+  idAntigo: string,
+  jogoRemoto: {
+    id: string;
+    nome: string;
+    nome_normalizado: string;
+    created_at: string;
+    updated_at: string;
+  }
+): Promise<void> {
+  if (idAntigo === jogoRemoto.id) return;
+
+  // 1. Libera o nome_normalizado do registro antigo para permitir inserir o oficial
+  await db.runAsync(
+    'UPDATE games SET nome_normalizado = ? WHERE id = ?',
+    `__temp_merge_${idAntigo}`,
+    idAntigo
+  );
+
+  // 2. Insere ou atualiza o jogo com o ID oficial vindo do Supabase
+  await db.runAsync(
+    `INSERT INTO games (id, nome, nome_normalizado, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       nome = excluded.nome,
+       nome_normalizado = excluded.nome_normalizado,
+       updated_at = excluded.updated_at`,
+    jogoRemoto.id,
+    jogoRemoto.nome,
+    jogoRemoto.nome_normalizado,
+    jogoRemoto.created_at,
+    jogoRemoto.updated_at
+  );
+
+  // 3. Migra todas as tabelas que possuem FOREIGN KEY para games(id)
+  await db.runAsync(
+    'UPDATE OR IGNORE participant_games SET game_id = ? WHERE game_id = ?',
+    jogoRemoto.id,
+    idAntigo
+  );
+  await db.runAsync('DELETE FROM participant_games WHERE game_id = ?', idAntigo);
+
+  await db.runAsync(
+    'UPDATE OR IGNORE event_participant_games SET game_id = ? WHERE game_id = ?',
+    jogoRemoto.id,
+    idAntigo
+  );
+  await db.runAsync('DELETE FROM event_participant_games WHERE game_id = ?', idAntigo);
+
+  await db.runAsync(
+    'UPDATE queue_entries SET game_id = ? WHERE game_id = ?',
+    jogoRemoto.id,
+    idAntigo
+  );
+
+  await db.runAsync(
+    'UPDATE OR IGNORE event_game_plays SET game_id = ? WHERE game_id = ?',
+    jogoRemoto.id,
+    idAntigo
+  );
+  await db.runAsync('DELETE FROM event_game_plays WHERE game_id = ?', idAntigo);
+
+  // 4. Atualiza referências pendentes na sync_outbox para apontarem para o ID remoto
+  const pendentes = await db.getAllAsync<{ id: string; entity_id: string; payload_json: string }>(
+    `SELECT id, entity_id, payload_json
+       FROM sync_outbox
+      WHERE entity_type IN ('participant_game', 'event_participant_game', 'queue_entry', 'event_game_play')`
+  );
+
+  for (const item of pendentes) {
+    try {
+      const json = JSON.parse(item.payload_json) as Record<string, unknown>;
+      if (json.game_id === idAntigo) {
+        json.game_id = jogoRemoto.id;
+        const novoEntityId = item.entity_id.includes(idAntigo)
+          ? item.entity_id.replace(idAntigo, jogoRemoto.id)
+          : item.entity_id;
+        await db.runAsync(
+          'UPDATE sync_outbox SET entity_id = ?, payload_json = ? WHERE id = ?',
+          novoEntityId,
+          JSON.stringify(json),
+          item.id
+        );
+      }
+    } catch {}
+  }
+
+  // 5. Remove o jogo antigo da outbox e da tabela games (agora sem vínculos pendentes)
+  await db.runAsync('DELETE FROM sync_outbox WHERE entity_type = ? AND entity_id = ?', 'game', idAntigo);
+  await db.runAsync('DELETE FROM games WHERE id = ?', idAntigo);
+}
+
 async function prepararPayload(
   db: SQLiteDatabase,
   registro: RegistroOutbox,
@@ -147,10 +242,46 @@ async function prepararPayload(
 ): Promise<Record<string, unknown>> {
   const payload = { ...payloadOriginal };
 
-  // O array `suggestions` é metadado local; as sugestões são enviadas como
-  // linhas próprias em event_feedback_game_suggestions.
   if (registro.entity_type === 'event_feedback') {
     delete payload.suggestions;
+    if (payload.liked_event !== undefined) payload.liked_event = Boolean(payload.liked_event);
+    if (payload.wanted_game !== undefined) payload.wanted_game = Boolean(payload.wanted_game);
+    if (payload.used_queue !== undefined) payload.used_queue = Boolean(payload.used_queue);
+  }
+
+ if (registro.entity_type === 'event') {
+    if (payload.details_downloaded !== undefined) {
+      payload.details_downloaded = Boolean(payload.details_downloaded);
+    }
+    // Sempre usa o estado mais atual do evento no SQLite (evita travar em versão antiga da outbox)
+    const eventoAtual = await db.getFirstAsync<{ situacao: string; encerrado_em: string | null; updated_at: string }>(
+      'SELECT situacao, encerrado_em, updated_at FROM events WHERE id = ?',
+      registro.entity_id
+    );
+    if (eventoAtual) {
+      payload.situacao = eventoAtual.situacao;
+      payload.encerrado_em = eventoAtual.encerrado_em;
+      payload.updated_at = eventoAtual.updated_at;
+    }
+    // Se ainda estiver 'em_andamento' mas o Supabase já tiver outro evento ativo, encerra o antigo para não travar a fila
+    if (payload.situacao === 'em_andamento' && supabase) {
+      const { data: ativoRemoto } = await supabase
+        .from('events')
+        .select('id')
+        .eq('situacao', 'em_andamento')
+        .maybeSingle();
+
+      if (ativoRemoto && ativoRemoto.id !== registro.entity_id) {
+        const agora = new Date().toISOString();
+        payload.situacao = 'encerrado';
+        payload.encerrado_em ??= agora;
+        await db.runAsync(
+          "UPDATE events SET situacao = 'encerrado', encerrado_em = COALESCE(encerrado_em, ?) WHERE id = ?",
+          agora,
+          registro.entity_id
+        );
+      }
+    }
   }
 
   if (registro.entity_type === 'event_day') {
@@ -189,6 +320,20 @@ async function enviarRegistro(
 
   if (registro.operation === 'upsert') {
     const payloadRemoto = await prepararPayload(db, registro, payload);
+
+    if (registro.entity_type === 'game' && typeof payloadRemoto.nome_normalizado === 'string') {
+      const { data: existenteRemoto, error: erroBusca } = await supabase
+        .from('games')
+        .select('id, nome, nome_normalizado, created_at, updated_at')
+        .eq('nome_normalizado', payloadRemoto.nome_normalizado)
+        .maybeSingle();
+
+      if (!erroBusca && existenteRemoto && existenteRemoto.id !== payloadRemoto.id) {
+        await unificarJogoLocalComRemoto(db, String(payloadRemoto.id), existenteRemoto);
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from(destino.tabela)
       .upsert(payloadRemoto as never, { onConflict: destino.conflito });
@@ -238,7 +383,6 @@ export type ResultadoSincronizacao = {
   mensagem?: string;
 };
 
-/** Envia operações locais pendentes, removendo-as somente após confirmação remota. */
 export async function sincronizarOutbox(db: SQLiteDatabase): Promise<ResultadoSincronizacao> {
   if (!supabase) {
     return { status: 'sem_configuracao', enviados: 0, pendentes: 0, mensagem: 'Supabase não configurado.' };
@@ -272,7 +416,13 @@ export async function sincronizarOutbox(db: SQLiteDatabase): Promise<ResultadoSi
 
     for (const registro of registros) {
       try {
-        await enviarRegistro(db, registro);
+        const registroAtualizado = await db.getFirstAsync<RegistroOutbox>(
+          'SELECT id, entity_type, entity_id, operation, payload_json, attempts FROM sync_outbox WHERE id = ?',
+          registro.id
+        );
+        if (!registroAtualizado) continue;
+
+        await enviarRegistro(db, registroAtualizado);
         await db.runAsync('DELETE FROM sync_outbox WHERE id = ?', registro.id);
         enviados += 1;
       } catch (erro) {
@@ -306,7 +456,6 @@ export type ResultadoDownload = {
 
 const TAMANHO_PAGINA = 500;
 
-/** Busca todas as páginas de uma tabela remota, com ordenação estável pela chave primária. */
 async function buscarTabelaRemota(config: ConfiguracaoDownload): Promise<Record<string, unknown>[]> {
   if (!supabase) throw new Error('Cliente Supabase não configurado.');
 
@@ -343,12 +492,6 @@ function gerarUpsertLocal(config: ConfiguracaoDownload): string {
   return `INSERT INTO ${config.tabela} (${colunas.join(', ')}) VALUES (${placeholders}) ON CONFLICT (${chaves}) ${atualizacao}`;
 }
 
-/**
- * Baixa o conteúdo remoto e grava no SQLite em ordem de dependência.
- * Registros com operações pendentes na outbox local não são sobrescritos:
- * isso protege alterações ainda não enviadas e exclusões aguardando sincronização.
- * Nenhum registro local é apagado nesta rotina.
- */
 export async function baixarDadosRemotos(db: SQLiteDatabase): Promise<ResultadoDownload> {
   if (!supabase) {
     return { status: 'sem_configuracao', baixados: 0, ignoradosComAlteracaoLocal: 0, mensagem: 'Supabase não configurado.' };
@@ -363,7 +506,6 @@ export async function baixarDadosRemotos(db: SQLiteDatabase): Promise<ResultadoD
   }
 
   try {
-    // A rede é consultada antes da transação para não manter o SQLite bloqueado durante downloads.
     const conjuntos: Array<{ config: ConfiguracaoDownload; linhas: Record<string, unknown>[] }> = [];
     for (const config of DOWNLOADS) {
       conjuntos.push({ config, linhas: await buscarTabelaRemota(config) });
@@ -379,6 +521,27 @@ export async function baixarDadosRemotos(db: SQLiteDatabase): Promise<ResultadoD
 
         for (const linha of linhas) {
           const entityId = config.entityId(linha);
+
+          if (config.tipo === 'game' && typeof linha.nome_normalizado === 'string') {
+            const jogoLocalMesmoNome = await db.getFirstAsync<{ id: string }>(
+              'SELECT id FROM games WHERE nome_normalizado = ? AND id != ?',
+              linha.nome_normalizado,
+              String(linha.id)
+            );
+
+            if (jogoLocalMesmoNome) {
+              await unificarJogoLocalComRemoto(db, jogoLocalMesmoNome.id, {
+                id: String(linha.id),
+                nome: String(linha.nome),
+                nome_normalizado: String(linha.nome_normalizado),
+                created_at: String(linha.created_at),
+                updated_at: String(linha.updated_at),
+              });
+              baixados += 1;
+              continue;
+            }
+          }
+
           const pendenciaLocal = await db.getFirstAsync<{ id: string }>(
             'SELECT id FROM sync_outbox WHERE entity_type = ? AND entity_id = ? LIMIT 1',
             config.tipo,
@@ -392,10 +555,13 @@ export async function baixarDadosRemotos(db: SQLiteDatabase): Promise<ResultadoD
 
           const valores = config.colunas.map((coluna) => {
             if (config.tabela === 'events' && coluna === 'details_downloaded') return 1;
-            return linha[coluna] === undefined ? null : linha[coluna];
+            const val = linha[coluna];
+            if (val === undefined) return null;
+            if (typeof val === 'boolean') return val ? 1 : 0;
+            return val;
           });
 
-          await db.runAsync(sqlUpsert, ...valores as (string | number | null | boolean)[]);
+          await db.runAsync(sqlUpsert, ...valores as (string | number | null)[]);
           baixados += 1;
         }
       }
