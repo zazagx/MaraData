@@ -86,6 +86,45 @@ function mapearEvento(row: EventoRow): Evento {
     encerradoEm: row.encerrado_em,
   };
 }
+function converterDataHoraEvento(dataStr: string, horaStr: string): Date | null {
+  const dataMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataStr.trim());
+  const horaMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(horaStr.trim());
+
+  if (!dataMatch || !horaMatch) return null;
+
+  const dia = Number(dataMatch[1]);
+  const mes = Number(dataMatch[2]);
+  const ano = Number(dataMatch[3]);
+  const hora = Number(horaMatch[1]);
+  const minuto = Number(horaMatch[2]);
+
+  const resultado = new Date(ano, mes - 1, dia, hora, minuto, 0, 0);
+
+  // Impede que datas inválidas sejam ajustadas automaticamente pelo JavaScript.
+  if (
+    resultado.getFullYear() !== ano ||
+    resultado.getMonth() !== mes - 1 ||
+    resultado.getDate() !== dia
+  ) {
+    return null;
+  }
+
+  return resultado;
+}
+
+function obterInicioEvento(evento: Evento): Date | null {
+  return converterDataHoraEvento(evento.dataInicio, evento.horarioInicio);
+}
+
+function obterTerminoEvento(evento: Evento): Date | null {
+  // Sem qualquer informação de término, o encerramento continua manual.
+  if (!evento.dataTermino && !evento.horarioTermino) return null;
+
+  const data = evento.dataTermino || evento.dataInicio;
+  const horario = evento.horarioTermino || '23:59';
+
+  return converterDataHoraEvento(data, horario);
+}
 
 export async function buscarEventos(db: SQLiteDatabase): Promise<Evento[]> {
   const rows = await db.getAllAsync<EventoRow>(
@@ -431,15 +470,22 @@ export async function registrarParticipanteNoEvento(
   return resultado;
 }
 
-export async function encerrarEvento(db: SQLiteDatabase, eventoId: string): Promise<Evento> {
+export async function encerrarEvento(
+  db: SQLiteDatabase,
+  eventoId: string,
+  permitirAgendadoPorHorario = false
+): Promise<Evento> {
   let encerrado: Evento | null = null;
 
   await db.withTransactionAsync(async () => {
     const atual = await buscarEventoPorId(db, eventoId);
     if (!atual) throw new Error('Evento não encontrado.');
-    if (atual.situacao !== 'em_andamento') {
-      throw new Error('Somente um evento em andamento pode ser encerrado.');
-    }
+    if (
+  atual.situacao !== 'em_andamento' &&
+  !(permitirAgendadoPorHorario && atual.situacao === 'agendado')
+) {
+  throw new Error('Somente um evento em andamento pode ser encerrado.');
+}
 
     const agora = new Date().toISOString();
     const eventoAtualizado: Evento = {
@@ -494,4 +540,87 @@ export async function encerrarEvento(db: SQLiteDatabase, eventoId: string): Prom
 
   if (!encerrado) throw new Error('Não foi possível encerrar o evento.');
   return encerrado;
+}
+/**
+ * Atualiza automaticamente a situação dos eventos conforme
+ * as datas e os horários cadastrados.
+ *
+ * Deve ser chamada ao carregar o contexto e periodicamente
+ * enquanto o aplicativo estiver aberto.
+ */
+export async function atualizarSituacaoEventosPorHorario(
+  db: SQLiteDatabase,
+  agora: Date = new Date()
+): Promise<void> {
+  const listaInicial = await buscarEventos(db);
+
+  // 1. Encerra eventos que já estão em andamento e atingiram o término.
+  const eventosParaEncerrar = listaInicial.filter((item) => {
+    if (item.situacao !== 'em_andamento') return false;
+
+    const termino = obterTerminoEvento(item);
+
+    return termino !== null && termino.getTime() <= agora.getTime();
+  });
+
+  for (const item of eventosParaEncerrar) {
+    await encerrarEvento(db, item.id);
+  }
+
+  // 2. Procura eventos agendados cujo início já chegou.
+  const listaAtualizada = await buscarEventos(db);
+
+  const eventosAgendados = listaAtualizada
+    .filter((item) => item.situacao === 'agendado')
+    .sort((a, b) => {
+      const inicioA = obterInicioEvento(a)?.getTime() ?? Infinity;
+      const inicioB = obterInicioEvento(b)?.getTime() ?? Infinity;
+      return inicioA - inicioB;
+    });
+
+  for (const item of eventosAgendados) {
+    const inicio = obterInicioEvento(item);
+
+    if (!inicio || inicio.getTime() > agora.getTime()) {
+      continue;
+    }
+
+    const termino = obterTerminoEvento(item);
+
+    // O período inteiro já passou sem que o aplicativo tenha
+    // registrado o início. Encerra sem presumir que houve operação.
+    if (termino && termino.getTime() <= agora.getTime()) {
+      await encerrarEvento(db, item.id, true);
+      continue;
+    }
+
+    // Não inicia outro evento enquanto existir um em andamento.
+    const outroEventoAtivo = await db.getFirstAsync<{ id: string }>(
+      `SELECT id
+         FROM events
+        WHERE situacao = 'em_andamento'
+        LIMIT 1`
+    );
+
+    if (outroEventoAtivo) {
+      break;
+    }
+
+    // Reutiliza o fluxo normal de salvamento:
+    // ele atualiza o evento, registra a outbox e inicia o primeiro dia.
+    await salvarEvento(db, {
+      id: item.id,
+      nomeEvento: item.nomeEvento,
+      localEvento: item.localEvento,
+      dataInicio: item.dataInicio,
+      dataTermino: item.dataTermino,
+      horarioInicio: item.horarioInicio,
+      horarioTermino: item.horarioTermino,
+      descricao: item.descricao,
+      situacao: 'em_andamento',
+    });
+
+    // Apenas um evento pode ser iniciado por verificação.
+    break;
+  }
 }

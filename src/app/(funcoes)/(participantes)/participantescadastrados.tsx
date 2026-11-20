@@ -15,8 +15,8 @@ import {
   buscarResumoPresencasEvento,
   concluirDiaEvento,
   definirPresencaManual,
-  iniciarDiaEvento,
   formatarDataDiaEvento,
+  iniciarDiaEvento,
   type DiaEvento,
   type ResumoPresencasEvento,
 } from '../../../features/armazenamentoPresencasFeedback';
@@ -79,6 +79,7 @@ export default function ParticipantesCadastrados() {
   const router = useRouter()
   const params = useLocalSearchParams<{ eventId?: string; situacao?: string }>();
   const eventId = typeof params.eventId === 'string' ? params.eventId : '';
+  const temEvento = Boolean(eventId);
   const eventoEncerrado = Boolean(eventId && params.situacao === 'encerrado');
 
   const [participantes, setParticipantes] = useState<Participante[]>([])
@@ -285,7 +286,7 @@ export default function ParticipantesCadastrados() {
 
         ListHeaderComponent={
           <View>
-            {eventId && (
+            {temEvento && (
               <View style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: 'row', backgroundColor: tema.surfaceSecondary, borderRadius: 12, padding: 4, gap: 4 }}>
                   <Pressable
@@ -376,7 +377,7 @@ export default function ParticipantesCadastrados() {
               />
             </View>
 
-            {eventId && !eventoEncerrado && (
+            {temEvento && !eventoEncerrado && (
               <Pressable
                 style={styles.botaoVincularExistente}
                 onPress={() => {
@@ -554,7 +555,7 @@ export default function ParticipantesCadastrados() {
         </ScrollView>
       )}
 
-      {eventId && participanteSelecionado && (
+      {temEvento && participanteSelecionado && (
         <View style={styles.acoesModal}>
           {participantesNoEvento.has(participanteSelecionado.id) ? (
             <>
@@ -656,7 +657,7 @@ export default function ParticipantesCadastrados() {
         </View>
       </Modal>
 
-      {eventId && diaSelecionado && (
+      {temEvento && diaSelecionado && (
         <Modal
           visible={modalPresencaVisivel}
           transparent
@@ -992,5 +993,27 @@ valorModal: {
   color: '#333',
   lineHeight: 21,
 },
+
+  itemModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+    gap: 10,
+  },
+
+  nomeItemModal: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#17152B',
+  },
+
+  jogosItemModal: {
+    fontSize: 12,
+    color: '#777777',
+    marginTop: 3,
+  },
 
 })
