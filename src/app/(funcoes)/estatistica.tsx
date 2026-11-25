@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Modal,
   Pressable,
   SafeAreaView,
@@ -304,6 +305,33 @@ export default function EstatisticaScreen() {
 
   useFocusEffect(useCallback(() => { void carregar(); }, [carregar]));
 
+  // Quando as estatísticas são abertas a partir dos detalhes de um evento,
+  // o retorno preserva esse contexto. Quando abertas pela Home, volta à Home.
+  const voltarDaEstatistica = useCallback(() => {
+    if (eventIdParam) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace({
+          pathname: '/(funcoes)/eventos/detalhes',
+          params: { eventId: eventIdParam },
+        });
+      }
+      return;
+    }
+
+    router.replace('/');
+  }, [eventIdParam]);
+
+  useFocusEffect(useCallback(() => {
+    const assinatura = BackHandler.addEventListener('hardwareBackPress', () => {
+      voltarDaEstatistica();
+      return true;
+    });
+
+    return () => assinatura.remove();
+  }, [voltarDaEstatistica]));
+
   const eventoAtual = useMemo(
     () => eventos.find((evento) => evento.id === eventoIdSelecionado) ?? null,
     [eventos, eventoIdSelecionado]
@@ -319,7 +347,22 @@ export default function EstatisticaScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tema.background }]}>
-      <Stack.Screen options={{ title: 'Estatísticas' }} />
+      <Stack.Screen
+        options={{
+          title: 'Estatísticas',
+          gestureEnabled: false,
+          headerLeft: () => (
+            <Pressable
+              onPress={voltarDaEstatistica}
+              style={{ marginLeft: 8, padding: 4 }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+            >
+              <Ionicons name="arrow-back" size={24} color={tema.text} />
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
         <View style={styles.cabecalho}>
           <Text style={[styles.tituloPrincipal, { color: tema.text }]}>Painel de estatísticas</Text>

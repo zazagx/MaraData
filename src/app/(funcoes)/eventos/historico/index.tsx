@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type Evento, useEvento } from '../../../../context/eventocontexto';
 import { useTema } from '../../../../context/temaContexto';
 import { useEstilosTema } from '../../../../context/temaEstilos';
@@ -21,6 +21,19 @@ export default function HistoricoIndex() {
   useFocusEffect(useCallback(() => {
     void recarregarEventos().catch((erro) => console.error('Erro ao atualizar histórico de eventos:', erro));
   }, [recarregarEventos]));
+
+  const voltarParaHome = useCallback(() => {
+    router.replace('/');
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    const assinatura = BackHandler.addEventListener('hardwareBackPress', () => {
+      voltarParaHome();
+      return true;
+    });
+
+    return () => assinatura.remove();
+  }, [voltarParaHome]));
 
   const temEvento = eventoAtivo && eventoAtivo.nomeEvento;
   const emAndamento = temEvento && eventoAtivo.situacao === 'em_andamento';
@@ -42,8 +55,18 @@ export default function HistoricoIndex() {
       
       {/* CABEÇALHO */}
       <View style={styles.header}>
-        <Text style={styles.titulo}>Histórico de Eventos</Text>
-        <Text style={styles.subtitulo}>Acompanhe seus eventos e torneios</Text>
+        <Pressable
+          onPress={voltarParaHome}
+          style={styles.botaoVoltarHome}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar para o início"
+        >
+          <Ionicons name="arrow-back" size={20} color={tema.text} />
+        </Pressable>
+        <View style={styles.headerTexto}>
+          <Text style={styles.titulo}>Histórico de Eventos</Text>
+          <Text style={styles.subtitulo}>Acompanhe seus eventos e torneios</Text>
+        </View>
       </View>
 
       {/* SEÇÃO: EVENTO EM ANDAMENTO / ATIVO */}
@@ -178,7 +201,9 @@ export default function HistoricoIndex() {
 
 const estilosBase = StyleSheet.create({
   container: { padding: 20, backgroundColor: '#F7F5FC', flexGrow: 1 },
-  header: { marginBottom: 20, marginTop: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20, marginTop: 10 },
+  headerTexto: { flex: 1 },
+  botaoVoltarHome: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ECE6F0' },
   titulo: { fontSize: 24, fontWeight: '900', color: '#1E1B2E', marginBottom: 4 },
   subtitulo: { fontSize: 14, color: '#6B7280' },
   secaoBox: { backgroundColor: '#8B5CF6', borderRadius: 24, padding: 20, marginBottom: 24, shadowColor: '#7C3AED', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
