@@ -3,6 +3,7 @@ import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Modal,
   Pressable,
@@ -25,6 +26,10 @@ import {
   type IndicadorSimNao,
   type RankingJogo,
 } from '../../features/armazenamentoEstatisticas';
+import {
+  compartilharRelatorioEvento,
+  compartilharRelatorioGeral,
+} from '../../services/relatoriosPdf';
 
 type ModoEstatistica = 'geral' | 'evento';
 
@@ -270,6 +275,7 @@ export default function EstatisticaScreen() {
   const [modalEventos, setModalEventos] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
 
   useEffect(() => {
     if (eventIdParam) {
@@ -342,6 +348,30 @@ export default function EstatisticaScreen() {
     setModo('evento');
     setModalEventos(false);
   }
+
+  const gerarRelatorioAtual = async () => {
+    if (gerandoRelatorio) return;
+
+    setGerandoRelatorio(true);
+    try {
+      if (modo === 'geral') {
+        await compartilharRelatorioGeral(db);
+      } else {
+        const idEvento = especificas?.evento.id || eventoIdSelecionado;
+        if (!idEvento) {
+          throw new Error('Selecione um evento antes de gerar o relatório.');
+        }
+        await compartilharRelatorioEvento(db, idEvento);
+      }
+    } catch (e) {
+      Alert.alert(
+        'Não foi possível gerar o relatório',
+        e instanceof Error ? e.message : 'Ocorreu um erro inesperado ao gerar o PDF.'
+      );
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  };
 
   const crescimento = gerais?.crescimentoPublico ?? [];
 
@@ -464,6 +494,18 @@ export default function EstatisticaScreen() {
                     </>
                   ) : <Text style={[styles.vazio, { color: tema.textSecondary }]}>Ainda não há evento encerrado para apresentar.</Text>}
                 </Secao>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={gerandoRelatorio}
+                  onPress={() => void gerarRelatorioAtual()}
+                  style={[styles.botaoRelatorio, { backgroundColor: tema.primary, opacity: gerandoRelatorio ? 0.7 : 1 }]}
+                >
+                  {gerandoRelatorio ? <ActivityIndicator color={tema.primaryText} /> : <Ionicons name="document-text-outline" size={19} color={tema.primaryText} />}
+                  <Text style={[styles.botaoRelatorioTexto, { color: tema.primaryText }]}>
+                    {gerandoRelatorio ? 'Gerando relatório...' : 'Gerar relatório PDF'}
+                  </Text>
+                </Pressable>
               </>
             ) : null}
           </>
@@ -522,6 +564,18 @@ export default function EstatisticaScreen() {
                 <Secao titulo="Avaliação dos participantes" subtitulo="Resultados dos feedbacks enviados após a participação." tema={tema}>
                   <BlocoFeedback dados={especificas.feedback} inscritos={especificas.inscritos} tema={tema} />
                 </Secao>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={gerandoRelatorio}
+                  onPress={() => void gerarRelatorioAtual()}
+                  style={[styles.botaoRelatorio, { backgroundColor: tema.primary, opacity: gerandoRelatorio ? 0.7 : 1 }]}
+                >
+                  {gerandoRelatorio ? <ActivityIndicator color={tema.primaryText} /> : <Ionicons name="document-text-outline" size={19} color={tema.primaryText} />}
+                  <Text style={[styles.botaoRelatorioTexto, { color: tema.primaryText }]}>
+                    {gerandoRelatorio ? 'Gerando relatório...' : 'Gerar relatório PDF deste evento'}
+                  </Text>
+                </Pressable>
               </>
             )}
           </>
@@ -606,6 +660,8 @@ const styles = StyleSheet.create({
   nomeEventoDestaque: { fontSize: 17, fontWeight: '900', marginTop: 4 },
   botaoVerEvento: { padding: 14, borderRadius: 11, marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   botaoVerEventoTexto: { fontSize: 12, fontWeight: '900' },
+  botaoRelatorio: { minHeight: 50, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 12, marginTop: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  botaoRelatorioTexto: { fontSize: 13, fontWeight: '900', textAlign: 'center' },
   seletorEvento: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 13, padding: 14, marginBottom: 13 },
   seletorRotulo: { fontSize: 9, letterSpacing: 1, fontWeight: '900' },
   seletorNome: { fontSize: 16, fontWeight: '900', marginTop: 4 },

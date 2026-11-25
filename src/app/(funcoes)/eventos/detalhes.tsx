@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   SafeAreaView,
@@ -11,11 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useEvento } from '../../../context/eventocontexto';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
+import { compartilharRelatorioEvento } from '../../../services/relatoriosPdf';
 
 export default function DetalhesEvento() {
+  const db = useSQLiteContext();
   const { tema } = useTema();
   const styles = useEstilosTema(estilosBase);
   const { evento: eventoSelecionado, eventos, encerrarEvento } = useEvento();
@@ -49,6 +53,7 @@ export default function DetalhesEvento() {
   // Estados dos modais de suporte[cite: 6]
   const [modalMenuVisivel, setModalMenuVisivel] = useState(false);
   const [modalEncerrarVisivel, setModalEncerrarVisivel] = useState(false);
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
 
   const situacaoFormatada =
     situacao === 'em_andamento'
@@ -107,6 +112,26 @@ export default function DetalhesEvento() {
       });
     } else if (tela === 'estatisticas') {
       router.push({ pathname: '/(funcoes)/estatistica', params: { eventId: eventId || '' } });
+    }
+  };
+
+  const gerarRelatorio = async () => {
+    const idEvento = eventId || eventoContexto?.id;
+    if (!idEvento || gerandoRelatorio) {
+      if (!idEvento) Alert.alert('Evento não identificado', 'Não foi possível localizar o identificador deste evento.');
+      return;
+    }
+
+    setGerandoRelatorio(true);
+    try {
+      await compartilharRelatorioEvento(db, idEvento);
+    } catch (erro) {
+      Alert.alert(
+        'Não foi possível gerar o relatório',
+        erro instanceof Error ? erro.message : 'Ocorreu um erro inesperado ao gerar o PDF.'
+      );
+    } finally {
+      setGerandoRelatorio(false);
     }
   };
 
@@ -322,6 +347,28 @@ export default function DetalhesEvento() {
               <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
             </TouchableOpacity>
           </View>
+
+          <Text style={[styles.cardSectionTitle, { marginTop: 24 }]}>Relatório do evento</Text>
+          <TouchableOpacity
+            style={styles.quickAccessCard}
+            onPress={() => void gerarRelatorio()}
+            disabled={gerandoRelatorio}
+            accessibilityRole="button"
+            accessibilityLabel="Gerar relatório PDF deste evento"
+          >
+            <View style={styles.quickIconBox}>
+              {gerandoRelatorio
+                ? <ActivityIndicator size="small" color={tema.primary} />
+                : <Ionicons name="document-text-outline" size={22} color={tema.primary} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.quickCardTitle}>
+                {gerandoRelatorio ? 'Gerando relatório...' : 'Gerar relatório PDF deste evento'}
+              </Text>
+              <Text style={styles.quickCardSub}>Compartilhar ou salvar os dados e indicadores deste evento</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#C4B5FD" />
+          </TouchableOpacity>
 
         </View>
       </ScrollView>

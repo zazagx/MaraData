@@ -45,8 +45,12 @@ export type FeedbackEstatistica = {
 export type EventoListaEstatistica = {
   id: string;
   nome: string;
+  localEvento: string;
   dataInicio: string;
   dataTermino: string | null;
+  horarioInicio: string;
+  horarioTermino: string | null;
+  descricao: string;
   situacao: string;
   presentes: number;
   presencas: number;
@@ -349,10 +353,19 @@ function dataAtualISO(): string {
 
 async function buscarEventoLista(db: SQLiteDatabase, eventId: string): Promise<EventoListaEstatistica | null> {
   const row = await db.getFirstAsync<{
-    id: string; nome_evento: string; data_inicio: string; data_termino: string | null;
-    situacao: string; encerrado_em: string | null;
+    id: string;
+    nome_evento: string;
+    local_evento: string;
+    data_inicio: string;
+    data_termino: string | null;
+    horario_inicio: string;
+    horario_termino: string | null;
+    descricao: string;
+    situacao: string;
+    encerrado_em: string | null;
   }>(
-    `SELECT id, nome_evento, data_inicio, data_termino, situacao, encerrado_em
+    `SELECT id, nome_evento, local_evento, data_inicio, data_termino,
+            horario_inicio, horario_termino, descricao, situacao, encerrado_em
        FROM events WHERE id = ?`, eventId
   );
   if (!row) return null;
@@ -364,9 +377,18 @@ async function buscarEventoLista(db: SQLiteDatabase, eventId: string): Promise<E
       WHERE ed.event_id = ?`, eventId
   );
   return {
-    id: row.id, nome: row.nome_evento, dataInicio: row.data_inicio, dataTermino: row.data_termino,
-    situacao: row.situacao, encerradoEm: row.encerrado_em,
-    presentes: numero(resumo?.presentes), presencas: numero(resumo?.presencas),
+    id: row.id,
+    nome: row.nome_evento,
+    localEvento: row.local_evento,
+    dataInicio: row.data_inicio,
+    dataTermino: row.data_termino,
+    horarioInicio: row.horario_inicio,
+    horarioTermino: row.horario_termino,
+    descricao: row.descricao,
+    situacao: row.situacao,
+    encerradoEm: row.encerrado_em,
+    presentes: numero(resumo?.presentes),
+    presencas: numero(resumo?.presencas),
   };
 }
 
