@@ -28,9 +28,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#8b0c08",
-          "image": "./assets/images/Splash-Screen-Vermelha.png",
-          "imageWidth": 402
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/maradata-lobo-sem-estrela.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
         }
       ],
       "expo-image",
@@ -38,7 +39,8 @@
       "@react-native-community/datetimepicker",
       "expo-sqlite",
       "expo-status-bar",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

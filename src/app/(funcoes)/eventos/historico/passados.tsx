@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -23,9 +23,6 @@ export default function PassadosScreen() {
       
       {/* CABEÇALHO */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.botaoVoltar}>
-          <Ionicons name="arrow-back" size={20} color={tema.text} />
-        </Pressable>
         <View>
           <Text style={styles.titulo}>Eventos Passados</Text>
           <Text style={styles.subtitulo}>Histórico de torneios e competições finalizadas</Text>
@@ -71,21 +68,8 @@ const estilosBase = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     marginBottom: 24,
     marginTop: 10,
-  },
-  botaoVoltar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ECE6F0',
   },
   titulo: {
     fontSize: 22,

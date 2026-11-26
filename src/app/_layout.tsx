@@ -1,33 +1,72 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Drawer } from "expo-router/drawer";
-import { SQLiteProvider } from "expo-sqlite";
-import { StatusBar } from "expo-status-bar";
+import { Ionicons } from '@expo/vector-icons';
+import { Drawer } from 'expo-router/drawer';
+import { SQLiteProvider } from 'expo-sqlite';
+import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
+} from 'react-native';
 
-import { EventProvider } from "../context/eventocontexto";
-import { AutenticacaoProvider, useAutenticacao } from "../context/autenticacaoContexto";
-import TelaLogin from "../components/TelaLogin";
-import SincronizacaoAutomatica from "../components/SincronizacaoAutomatica";
-import { TemaProvider, useTema } from "../context/temaContexto";
-import { migrateDbIfNeeded } from "../database/migrations";
+import { EventProvider, useEvento } from '../context/eventocontexto';
+import { AutenticacaoProvider, useAutenticacao } from '../context/autenticacaoContexto';
+import TelaLogin from '../components/TelaLogin';
+import AberturaAnimada from '../components/AberturaAnimada';
+import SincronizacaoAutomatica from '../components/SincronizacaoAutomatica';
+import { TemaProvider, useTema } from '../context/temaContexto';
+import { migrateDbIfNeeded } from '../database/migrations';
+
+// Mantém a splash nativa visível até SQLite, autenticação e eventos estarem prontos.
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 // Componente responsável pela navegação
 function ConteudoLayout() {
   const { tema, modoEscuro, alternarTema } = useTema();
   const { sessao, carregandoAutenticacao, entrar } = useAutenticacao();
+  const { carregandoEventos } = useEvento();
 
-  if (carregandoAutenticacao) {
+  const [splashNativaOculta, setSplashNativaOculta] = useState(false);
+  const [aberturaConcluida, setAberturaConcluida] = useState(false);
+  const carregandoInicial = carregandoAutenticacao || carregandoEventos;
+
+  useEffect(() => {
+    if (carregandoInicial || splashNativaOculta) return;
+
+    let ativo = true;
+
+    void SplashScreen.hideAsync()
+      .catch((erro: unknown) => {
+        console.warn('Não foi possível ocultar a splash nativa:', erro);
+      })
+      .finally(() => {
+        if (ativo) setSplashNativaOculta(true);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [carregandoInicial, splashNativaOculta]);
+
+  const concluirAbertura = useCallback(() => {
+    setAberturaConcluida(true);
+  }, []);
+
+  // A splash nativa permanece enquanto os dados iniciais são preparados.
+  // Em seguida, a animação personalizada roda uma vez por abertura do app.
+  if (carregandoInicial || !splashNativaOculta || !aberturaConcluida) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: tema.background }}>
-        <ActivityIndicator size="large" color={tema.primary} />
-        <Text style={{ color: tema.textSecondary, marginTop: 12 }}>Verificando acesso...</Text>
+      <View style={styles.telaAbertura}>
+        <StatusBar style="dark" />
+        {!carregandoInicial && (
+          <AberturaAnimada
+            iniciar={splashNativaOculta}
+            onFinish={concluirAbertura}
+          />
+        )}
       </View>
     );
   }
@@ -39,13 +78,13 @@ function ConteudoLayout() {
   return (
     <>
       <SincronizacaoAutomatica />
-      <StatusBar style={modoEscuro ? "light" : "dark"} />
+      <StatusBar style={modoEscuro ? 'light' : 'dark'} />
 
       <Drawer
         screenOptions={{
           headerLeft: () => (
             <Image
-              source={require("../../assets/images/Logo-MaraGames.png")}
+              source={require('../../assets/images/Logo-MaraGames.png')}
               style={styles.headerLogo}
               resizeMode="contain"
             />
@@ -62,14 +101,12 @@ function ConteudoLayout() {
               accessibilityRole="button"
               accessibilityLabel={
                 modoEscuro
-                  ? "Ativar tema claro"
-                  : "Ativar tema escuro"
+                  ? 'Ativar tema claro'
+                  : 'Ativar tema escuro'
               }
             >
               <Ionicons
-                name={
-                  modoEscuro ? "sunny-outline" : "moon-outline"
-                }
+                name={modoEscuro ? 'sunny-outline' : 'moon-outline'}
                 size={23}
                 color={tema.primary}
               />
@@ -81,7 +118,7 @@ function ConteudoLayout() {
             backgroundColor: tema.header,
           },
 
-          headerTitleAlign: "left",
+          headerTitleAlign: 'left',
           headerTintColor: tema.text,
 
           // Menu lateral
@@ -110,8 +147,8 @@ function ConteudoLayout() {
         <Drawer.Screen
           name="index"
           options={{
-            title: "HeaderTitle",
-            drawerLabel: "Início",
+            title: 'HeaderTitle',
+            drawerLabel: 'Início',
 
             headerTitle: () => (
               <View style={styles.headerTitle}>
@@ -133,17 +170,16 @@ function ConteudoLayout() {
           options={{
             headerShown: false,
             drawerItemStyle: {
-              display: "none",
+              display: 'none',
             },
           }}
         />
-
       </Drawer>
     </>
   );
 }
 
-// Layout principal: disponibiliza os dois contextos
+// Layout principal: disponibiliza os contextos e inicializa o banco local.
 export default function RootLayout() {
   return (
     <SQLiteProvider
@@ -162,29 +198,30 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  telaAbertura: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   headerTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     gap: 8,
   },
-
   headerLogo: {
     width: 42,
     height: 42,
   },
-
   headerTitleText: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
-
   themeButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
 });

@@ -50,19 +50,28 @@ export default function HistoricoIndex() {
     .filter((item: Evento) => item.situacao === 'encerrado')
     .sort((a, b) => converterDataParaObjeto(b.dataInicio).getTime() - converterDataParaObjeto(a.dataInicio).getTime());
 
+  const abrirDetalhesEvento = (item: Evento) => {
+    router.push({
+      pathname: '/(funcoes)/eventos/detalhes',
+      params: {
+        eventId: item.id,
+        nomeEvento: item.nomeEvento,
+        localEvento: item.localEvento,
+        dataInicio: item.dataInicio,
+        dataTermino: item.dataTermino,
+        horarioInicio: item.horarioInicio,
+        horarioTermino: item.horarioTermino,
+        descricao: item.descricao,
+        situacao: item.situacao,
+      },
+    });
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       
       {/* CABEÇALHO */}
       <View style={styles.header}>
-        <Pressable
-          onPress={voltarParaHome}
-          style={styles.botaoVoltarHome}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar para o início"
-        >
-          <Ionicons name="arrow-back" size={20} color={tema.text} />
-        </Pressable>
         <View style={styles.headerTexto}>
           <Text style={styles.titulo}>Histórico de Eventos</Text>
           <Text style={styles.subtitulo}>Acompanhe seus eventos e torneios</Text>
@@ -129,7 +138,13 @@ export default function HistoricoIndex() {
           <Ionicons name="calendar" size={18} color={tema.primary} />
           <Text style={styles.secaoTitulo}>Eventos Agendados</Text>
         </View>
-        <Pressable onPress={() => router.push('/(funcoes)/eventos/historico/agendados')}>
+        <Pressable
+          onPress={() => router.push('/(funcoes)/eventos/historico/agendados')}
+          style={styles.botaoVerTodos}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Ver todos os eventos agendados"
+        >
           <Text style={styles.verTodosTexto}>Ver todos &gt;</Text>
         </Pressable>
       </View>
@@ -165,7 +180,13 @@ export default function HistoricoIndex() {
           <Ionicons name="time" size={18} color={tema.primary} />
           <Text style={styles.secaoTitulo}>Eventos Passados</Text>
         </View>
-        <Pressable onPress={() => router.push('/(funcoes)/eventos/historico/passados')}>
+        <Pressable
+          onPress={() => router.push('/(funcoes)/eventos/historico/passados')}
+          style={styles.botaoVerTodos}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Ver todos os eventos passados"
+        >
           <Text style={styles.verTodosTexto}>Ver todos &gt;</Text>
         </Pressable>
       </View>
@@ -175,7 +196,7 @@ export default function HistoricoIndex() {
           <Pressable 
             key={item.id || index}
             style={[styles.cardItemLista, index === listaPassados.slice(0, 3).length - 1 && { marginBottom: 30 }]}
-            onPress={() => router.push('/(funcoes)/eventos/historico/passados')}
+            onPress={() => abrirDetalhesEvento(item)}
           >
             <View style={styles.iconeMiniContainerPassado}>
               <MaterialCommunityIcons name="trophy-outline" size={24} color="#FFFFFF" />
@@ -203,7 +224,6 @@ const estilosBase = StyleSheet.create({
   container: { padding: 20, backgroundColor: '#F7F5FC', flexGrow: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20, marginTop: 10 },
   headerTexto: { flex: 1 },
-  botaoVoltarHome: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ECE6F0' },
   titulo: { fontSize: 24, fontWeight: '900', color: '#1E1B2E', marginBottom: 4 },
   subtitulo: { fontSize: 14, color: '#6B7280' },
   secaoBox: { backgroundColor: '#8B5CF6', borderRadius: 24, padding: 20, marginBottom: 24, shadowColor: '#7C3AED', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
@@ -224,6 +244,7 @@ const estilosBase = StyleSheet.create({
   secaoTituloRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   secaoTitulo: { fontSize: 16, fontWeight: '800', color: '#1E1B2E' },
   verTodosTexto: { fontSize: 13, fontWeight: '700', color: '#7C3AED' },
+  botaoVerTodos: { minHeight: 44, minWidth: 88, paddingHorizontal: 8, paddingVertical: 8, alignItems: 'flex-end', justifyContent: 'center' },
   cardItemLista: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#ECE6F0', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, elevation: 1 },
   iconeMiniContainer: { width: 50, height: 50, borderRadius: 14, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   iconeMiniContainerPassado: { width: 50, height: 50, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', marginRight: 12 },

@@ -26,6 +26,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import {
   Alert,
   FlatList,
@@ -275,7 +276,6 @@ export default function ParticipantesCadastrados() {
         }}
       />
 
-
       {/* PARTICIPANT LIST */}
 
       <FlatList
@@ -465,6 +465,15 @@ export default function ParticipantesCadastrados() {
             </View>
           )
         }}
+        ListFooterComponent={(
+          <View style={styles.mascoteContainer} pointerEvents="none">
+            <Image
+              source={require('../../../components/icons/LoboIcone.png')}
+              style={styles.logoFundo}
+              contentFit="contain"
+            />
+          </View>
+        )}
       />
       <Modal
   visible={participanteSelecionado !== null}
@@ -714,7 +723,6 @@ export default function ParticipantesCadastrados() {
           </View>
         </Modal>
       )}
-
     </View>
   )
 }
@@ -1015,5 +1023,7 @@ valorModal: {
     color: '#777777',
     marginTop: 3,
   },
+  mascoteContainer: { height: 180, alignItems: 'center', justifyContent: 'center', marginTop: 25, marginBottom: 10 },
+  logoFundo: { width: 150, height: 150, opacity: 0.10 },
 
 })

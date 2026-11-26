@@ -137,16 +137,22 @@ export default function DetalhesEvento() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Botão de voltar customizado para retornar direto à Home[cite: 6] */}
+      {/* Retorna à tela que abriu os detalhes, preservando a origem da navegação. */}
       <Stack.Screen
         options={{
           headerShown: true,
           title: 'Detalhes do evento',
           headerLeft: () => (
             <TouchableOpacity 
-              onPress={() => router.replace('/')} 
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/');
+                }
+              }}
               style={{ marginLeft: 4, marginRight: 12 }}
-              accessibilityLabel="Voltar para Home"
+              accessibilityLabel="Voltar à tela anterior"
             >
               <Ionicons name="arrow-back" size={24} color={tema.text} />
             </TouchableOpacity>
