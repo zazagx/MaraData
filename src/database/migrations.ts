@@ -467,5 +467,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     versao = 5;
   }
 
-  await preencherDiasDeEventosExistentes(db);
+  // O preenchimento retroativo dos dias é uma migração de dados, não uma
+  // tarefa que precisa ser repetida em todas as aberturas do aplicativo.
+  // A versão 6 registra que esse backfill já foi concluído neste banco.
+  // Se houver falha durante o processo, user_version permanece em 5 e a
+  // operação será retomada na próxima inicialização (ela é idempotente).
+  if (versao < 6) {
+    await preencherDiasDeEventosExistentes(db);
+    await db.execAsync('PRAGMA user_version = 6;');
+  }
 }

@@ -16,8 +16,9 @@ type AberturaAnimadaProps = {
   onFinish: () => void;
 };
 
-// O pico de impacto do arquivo MaraData_Splash_sound.mp3 ocorre em ~1,532 s.
-// A rotação termina em 1,530 s; o encaixe e o toque tátil começam nesse ponto.
+// O impacto principal do áudio foi preparado para coincidir com o fim da rotação.
+// Se o áudio não carregar a tempo, a animação continua silenciosamente.
+const TEMPO_MAX_ESPERA_AUDIO_MS = 1500;
 const TEMPO_SEGURANCA_AUDIO_MS = 5200;
 
 /**
@@ -60,135 +61,153 @@ export default function AberturaAnimada({
     }
   }, [audioStatus.didJustFinish, audioStatus.error]);
 
+  const iniciarSequenciaRef = useRef<(usarAudio: boolean) => void>(() => undefined);
+
+  // Prepara a animação uma única vez. O estado do áudio é observado em outro
+  // efeito para que uma mudança tardia do player não cancele uma animação já iniciada.
   useEffect(() => {
     if (!iniciar || iniciou.current) return;
 
-    // No navegador, a reprodução automática pode ser bloqueada pelo próprio
-    // browser. O fluxo visual não depende do áudio para continuar.
-    const plataformaSemAudio = Platform.OS === 'web';
-    const audioPronto = audioStatus.isLoaded || Boolean(audioStatus.error);
-
-    if (!plataformaSemAudio && !audioPronto) return;
-
-    iniciou.current = true;
     let cancelada = false;
-    let animacaoAtual: Animated.CompositeAnimation | null = null;
+    let temporizadorAudio: ReturnType<typeof setTimeout> | null = null;
     let temporizadorSeguranca: ReturnType<typeof setTimeout> | null = null;
+    let animacaoAtual: Animated.CompositeAnimation | null = null;
 
-    if (plataformaSemAudio || audioStatus.error || !audioStatus.isLoaded) {
-      setSomFinalizado(true);
-    } else {
-      try {
-        audioPlayer.volume = 1;
-        audioPlayer.seekTo(0);
-        // O áudio e a animação são iniciados no mesmo ciclo do JavaScript.
-        audioPlayer.play();
-        // Proteção contra falha ou ausência do evento de fim do player.
-        temporizadorSeguranca = setTimeout(
-          () => setSomFinalizado(true),
-          TEMPO_SEGURANCA_AUDIO_MS,
-        );
-      } catch (erro) {
-        console.warn('Não foi possível reproduzir o som da abertura:', erro);
-        setSomFinalizado(true);
+    const iniciarSequencia = (usarAudio: boolean) => {
+      if (cancelada || iniciou.current) return;
+      iniciou.current = true;
+      if (temporizadorAudio) {
+        clearTimeout(temporizadorAudio);
+        temporizadorAudio = null;
       }
-    }
 
-    const iniciarEncaixe = () => {
-      if (cancelada) return;
+      // A animação não depende do áudio. O áudio é um complemento opcional.
+      if (!usarAudio) {
+        setSomFinalizado(true);
+      } else {
+        try {
+          audioPlayer.volume = 1;
+          audioPlayer.seekTo(0);
+          audioPlayer.play();
+          // Proteção caso o player não emita o evento de término.
+          temporizadorSeguranca = setTimeout(
+            () => setSomFinalizado(true),
+            TEMPO_SEGURANCA_AUDIO_MS,
+          );
+        } catch (erro) {
+          console.warn('Não foi possível reproduzir o som da abertura:', erro);
+          setSomFinalizado(true);
+        }
+      }
 
-      // Dispara no começo do encaixe: coincide com o impacto do MP3 (~1,532 s).
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-        () => undefined,
-      );
+      const iniciarEncaixe = () => {
+        if (cancelada) return;
 
-      const ampliar = Animated.timing(escalaEstrela, {
-        toValue: 1.1,
-        duration: 80,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      });
+        // O impacto tátil coincide com o começo do encaixe da estrela.
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+          () => undefined,
+        );
 
-      animacaoAtual = ampliar;
-      ampliar.start(({ finished }) => {
-        if (!finished || cancelada) return;
-
-        const encaixe = Animated.sequence([
-          Animated.timing(escalaEstrela, {
-            toValue: 0.98,
-            duration: 65,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.spring(escalaEstrela, {
-            toValue: 1,
-            speed: 25,
-            bounciness: 5,
-            useNativeDriver: true,
-          }),
-        ]);
-
-        animacaoAtual = encaixe;
-        encaixe.start(({ finished: encaixeConcluido }) => {
-          if (encaixeConcluido && !cancelada) {
-            setEncaixeFinalizado(true);
-          }
+        const ampliar = Animated.timing(escalaEstrela, {
+          toValue: 1.1,
+          duration: 80,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
         });
+
+        animacaoAtual = ampliar;
+        ampliar.start(({ finished }) => {
+          if (!finished || cancelada) return;
+
+          const encaixe = Animated.sequence([
+            Animated.timing(escalaEstrela, {
+              toValue: 0.98,
+              duration: 65,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.spring(escalaEstrela, {
+              toValue: 1,
+              speed: 25,
+              bounciness: 5,
+              useNativeDriver: true,
+            }),
+          ]);
+
+          animacaoAtual = encaixe;
+          encaixe.start(({ finished: encaixeConcluido }) => {
+            if (encaixeConcluido && !cancelada) {
+              setEncaixeFinalizado(true);
+            }
+          });
+        });
+      };
+
+      const entradaEstrela = Animated.sequence([
+        Animated.delay(180),
+        Animated.parallel([
+          Animated.timing(opacidadeEstrela, {
+            toValue: 1,
+            duration: 240,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotacaoEstrela, {
+            toValue: 1,
+            duration: 1350,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]);
+
+      const entradaTitulo = Animated.sequence([
+        Animated.delay(620),
+        Animated.parallel([
+          Animated.timing(opacidadeTitulo, {
+            toValue: 1,
+            duration: 430,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(deslocamentoTitulo, {
+            toValue: 0,
+            duration: 430,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]);
+
+      const entradaInicial = Animated.parallel([entradaEstrela, entradaTitulo]);
+      animacaoAtual = entradaInicial;
+      entradaInicial.start(({ finished }) => {
+        if (finished && !cancelada) iniciarEncaixe();
       });
     };
 
-    const entradaEstrela = Animated.sequence([
-      Animated.delay(180),
-      Animated.parallel([
-        Animated.timing(opacidadeEstrela, {
-          toValue: 1,
-          duration: 240,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotacaoEstrela, {
-          toValue: 1,
-          duration: 1350,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]);
+    iniciarSequenciaRef.current = iniciarSequencia;
 
-    const entradaTitulo = Animated.sequence([
-      Animated.delay(620),
-      Animated.parallel([
-        Animated.timing(opacidadeTitulo, {
-          toValue: 1,
-          duration: 430,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(deslocamentoTitulo, {
-          toValue: 0,
-          duration: 430,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]);
-
-    const entradaInicial = Animated.parallel([entradaEstrela, entradaTitulo]);
-    animacaoAtual = entradaInicial;
-    entradaInicial.start(({ finished }) => {
-      if (finished && !cancelada) iniciarEncaixe();
-    });
+    if (Platform.OS === 'web') {
+      iniciarSequencia(false);
+    } else {
+      // Dá uma janela curta para o áudio carregar, mas nunca deixa a Splash presa.
+      temporizadorAudio = setTimeout(
+        () => iniciarSequencia(false),
+        TEMPO_MAX_ESPERA_AUDIO_MS,
+      );
+    }
 
     return () => {
       cancelada = true;
+      iniciarSequenciaRef.current = () => undefined;
       animacaoAtual?.stop();
+      if (temporizadorAudio) clearTimeout(temporizadorAudio);
       if (temporizadorSeguranca) clearTimeout(temporizadorSeguranca);
       audioPlayer.pause();
     };
   }, [
     iniciar,
-    audioStatus.isLoaded,
-    audioStatus.error,
     audioPlayer,
     deslocamentoTitulo,
     escalaEstrela,
@@ -197,7 +216,20 @@ export default function AberturaAnimada({
     rotacaoEstrela,
   ]);
 
-  // A tela só sai depois do encaixe visual e do término da reverberação do áudio.
+  // Quando o MP3 fica pronto (ou falha), decide se a abertura usará o som.
+  // Se o limite de 1,5 s já tiver iniciado a versão silenciosa, o ref ignora a mudança.
+  useEffect(() => {
+    if (!iniciar || iniciou.current) return;
+
+    if (Platform.OS === 'web' || audioStatus.error) {
+      iniciarSequenciaRef.current(false);
+    } else if (audioStatus.isLoaded) {
+      iniciarSequenciaRef.current(true);
+    }
+  }, [iniciar, audioStatus.isLoaded, audioStatus.error]);
+
+  // A tela só sai depois do encaixe visual e do término da reverberação do áudio,
+  // quando ele tiver sido reproduzido.
   useEffect(() => {
     if (
       !iniciar ||

@@ -32,6 +32,10 @@ type EventContextType = {
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
 
+// A consulta local normalmente termina rapidamente. Este limite evita manter
+// a abertura presa se o dispositivo ou o banco responderem muito lentamente.
+const TEMPO_MAX_CARREGAMENTO_INICIAL_MS = 8_000;
+
 type EventProviderProps = {
   children: ReactNode;
 };
@@ -82,11 +86,26 @@ export function EventProvider({ children }: EventProviderProps) {
     let ativo = true;
 
     async function carregar() {
+      let temporizador: ReturnType<typeof setTimeout> | null = null;
+
       try {
-        await recarregarEventos();
+        const carregamento = recarregarEventos();
+        const limiteDeEspera = new Promise<void>((resolve) => {
+          temporizador = setTimeout(() => {
+            console.warn(
+              'A consulta inicial de eventos está demorando. O aplicativo continuará abrindo; os eventos serão atualizados quando a consulta local terminar.',
+            );
+            resolve();
+          }, TEMPO_MAX_CARREGAMENTO_INICIAL_MS);
+        });
+
+        // Se atingir o limite, a consulta original continua em segundo plano.
+        // Quando terminar, recarregarEventos ainda atualizará o contexto.
+        await Promise.race([carregamento, limiteDeEspera]);
       } catch (erro) {
         console.error('Erro ao carregar eventos do SQLite:', erro);
       } finally {
+        if (temporizador) clearTimeout(temporizador);
         if (ativo) {
           setCarregandoEventos(false);
         }

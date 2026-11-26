@@ -17,6 +17,10 @@ type AutenticacaoContextoTipo = {
 
 const AutenticacaoContexto = createContext<AutenticacaoContextoTipo | undefined>(undefined);
 
+// A sessão é recuperada do armazenamento local. Se a leitura não responder,
+// liberamos a abertura mostrando o login, sem bloquear o aplicativo indefinidamente.
+const TEMPO_MAX_RECUPERACAO_SESSAO_MS = 10_000;
+
 export function AutenticacaoProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Session | null>(null);
   const [carregandoAutenticacao, setCarregandoAutenticacao] = useState(true);
@@ -28,26 +32,46 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
     }
 
     let ativo = true;
+    let carregamentoConcluido = false;
+    let temporizador: ReturnType<typeof setTimeout> | null = null;
+
+    const liberarAbertura = () => {
+      if (!ativo || carregamentoConcluido) return;
+      carregamentoConcluido = true;
+      if (temporizador) clearTimeout(temporizador);
+      setCarregandoAutenticacao(false);
+    };
+
+    temporizador = setTimeout(() => {
+      if (!ativo || carregamentoConcluido) return;
+      console.warn(
+        'A recuperação da sessão Supabase excedeu o tempo limite. O aplicativo continuará para a tela de login; uma resposta posterior ainda poderá atualizar a sessão.',
+      );
+      liberarAbertura();
+    }, TEMPO_MAX_RECUPERACAO_SESSAO_MS);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evento, novaSessao) => {
       if (!ativo) return;
       setSessao(novaSessao);
-      setCarregandoAutenticacao(false);
+      liberarAbertura();
     });
 
-    // Recupera a sessão persistida no dispositivo.
+    // Recupera a sessão persistida no dispositivo. A leitura não depende de
+    // uma sincronização remota para liberar a interface.
     void supabase.auth.getSession().then(({ data, error }) => {
       if (!ativo) return;
       if (error) console.warn('Não foi possível recuperar a sessão Supabase:', error.message);
       setSessao(data.session);
-      setCarregandoAutenticacao(false);
+      liberarAbertura();
     }).catch((erro: unknown) => {
       if (!ativo) return;
       console.warn('Falha ao carregar a sessão Supabase:', erro);
-      setCarregandoAutenticacao(false);
+      liberarAbertura();
     });
 
     return () => {
       ativo = false;
+      if (temporizador) clearTimeout(temporizador);
       subscription.unsubscribe();
     };
   }, []);
