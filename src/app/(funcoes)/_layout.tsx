@@ -3,6 +3,7 @@ import { Stack, router, useGlobalSearchParams, usePathname } from 'expo-router';
 import { useEffect } from 'react';
 import { BackHandler, Pressable } from 'react-native';
 import { useTema } from '../../context/temaContexto';
+import BotaoTemaHeader from '../../components/BotaoTemaHeader';
 
 export default function FuncoesLayout() {
   const { tema } = useTema();
@@ -55,6 +56,7 @@ export default function FuncoesLayout() {
         contentStyle: {
           backgroundColor: tema.background,
         },
+        headerRight: () => <BotaoTemaHeader />, 
       }}
     >
       <Stack.Screen

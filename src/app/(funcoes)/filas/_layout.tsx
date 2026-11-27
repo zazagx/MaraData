@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { useTema } from '../../../context/temaContexto';
+import BotaoTemaHeader from '../../../components/BotaoTemaHeader';
 
 export default function FilasLayout() {
   const { tema } = useTema();
@@ -18,6 +19,7 @@ export default function FilasLayout() {
         contentStyle: {
           backgroundColor: tema.background,
         },
+        headerRight: () => <BotaoTemaHeader />, 
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Filas' }} />

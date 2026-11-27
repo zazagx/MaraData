@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef, useState } from 'react';
+import type { TextInputInstance } from 'react-native';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,12 +22,23 @@ type Props = {
 
 export default function TelaLogin({ onEntrar }: Props) {
   const { tema } = useTema();
+  const senhaRef = useRef<TextInputInstance>(null);
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  const [tecladoVisivel, setTecladoVisivel] = useState(false);
 
   const configurado = supabaseEstaConfigurado();
+
+  useEffect(() => {
+    const mostrar = Keyboard.addListener('keyboardDidShow', () => setTecladoVisivel(true));
+    const ocultar = Keyboard.addListener('keyboardDidHide', () => setTecladoVisivel(false));
+    return () => {
+      mostrar.remove();
+      ocultar.remove();
+    };
+  }, []);
 
   async function enviar() {
     setErro('');
@@ -33,6 +47,7 @@ export default function TelaLogin({ onEntrar }: Props) {
       return;
     }
 
+    Keyboard.dismiss();
     setCarregando(true);
     try {
       await onEntrar(email, senha);
@@ -46,12 +61,34 @@ export default function TelaLogin({ onEntrar }: Props) {
   return (
     <KeyboardAvoidingView
       style={[styles.tela, { backgroundColor: tema.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      enabled
     >
-      <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.conteudo}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'on-drag' : 'none'}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[styles.cartao, { backgroundColor: tema.surface, borderColor: tema.border }]}>
-          <Text style={[styles.marca, { color: tema.brand }]}>MaraData</Text>
-          <Text style={[styles.titulo, { color: tema.text }]}>Acesso da equipe</Text>
+          <View style={styles.cabecalhoCartao}>
+            <View style={styles.titulos}>
+              <Text style={[styles.marca, { color: tema.brand }]}>MaraData</Text>
+              <Text style={[styles.titulo, { color: tema.text }]}>Acesso da equipe</Text>
+            </View>
+            {tecladoVisivel && (
+              <Pressable
+                onPress={Keyboard.dismiss}
+                style={[styles.botaoOcultarTeclado, { backgroundColor: tema.surfaceSecondary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Ocultar teclado"
+              >
+                <Ionicons name="chevron-down" size={17} color={tema.primary} />
+                <Text style={[styles.textoOcultarTeclado, { color: tema.primary }]}>Ocultar</Text>
+              </Pressable>
+            )}
+          </View>
+
           <Text style={[styles.descricao, { color: tema.textSecondary }]}>Entre com a conta compartilhada da MaraGames. A sessão ficará salva neste dispositivo.</Text>
 
           <Text style={[styles.rotulo, { color: tema.text }]}>E-mail</Text>
@@ -62,24 +99,30 @@ export default function TelaLogin({ onEntrar }: Props) {
             autoCorrect={false}
             keyboardType="email-address"
             textContentType="emailAddress"
+            autoComplete="email"
             placeholder="e-mail da equipe"
             placeholderTextColor={tema.textSecondary}
             editable={!carregando && configurado}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => senhaRef.current?.focus()}
             style={[styles.campo, { color: tema.text, borderColor: tema.border, backgroundColor: tema.background }]}
           />
 
           <Text style={[styles.rotulo, { color: tema.text }]}>Senha</Text>
           <TextInput
+            ref={senhaRef}
             value={senha}
             onChangeText={setSenha}
             secureTextEntry
             autoCapitalize="none"
             textContentType="password"
+            autoComplete="current-password"
             placeholder="Senha da conta"
             placeholderTextColor={tema.textSecondary}
             editable={!carregando && configurado}
             onSubmitEditing={enviar}
-            returnKeyType="done"
+            returnKeyType="go"
             style={[styles.campo, { color: tema.text, borderColor: tema.border, backgroundColor: tema.background }]}
           />
 
@@ -106,10 +149,14 @@ export default function TelaLogin({ onEntrar }: Props) {
 
 const styles = StyleSheet.create({
   tela: { flex: 1 },
-  conteudo: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  conteudo: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingVertical: 32 },
   cartao: { width: '100%', maxWidth: 440, alignSelf: 'center', borderWidth: 1, borderRadius: 20, padding: 24 },
+  cabecalhoCartao: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  titulos: { flex: 1 },
   marca: { fontSize: 16, fontWeight: '800', marginBottom: 8 },
   titulo: { fontSize: 26, fontWeight: '800', marginBottom: 8 },
+  botaoOcultarTeclado: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 7, marginTop: 2 },
+  textoOcultarTeclado: { fontSize: 12, fontWeight: '700' },
   descricao: { fontSize: 14, lineHeight: 21, marginBottom: 24 },
   rotulo: { fontSize: 14, fontWeight: '700', marginBottom: 7 },
   campo: { minHeight: 48, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, marginBottom: 16, fontSize: 16 },

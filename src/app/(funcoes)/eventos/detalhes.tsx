@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,13 @@ import { useEvento } from '../../../context/eventocontexto';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 import { compartilharRelatorioEvento } from '../../../services/relatoriosPdf';
+import {
+  buscarDiasEvento,
+  concluirDiaEvento,
+  formatarDataDiaEvento,
+  iniciarDiaEvento,
+  type DiaEvento,
+} from '../../../features/armazenamentoPresencasFeedback';
 
 export default function DetalhesEvento() {
   const db = useSQLiteContext();
@@ -50,6 +57,66 @@ export default function DetalhesEvento() {
   const horarioTermino = eventoContexto?.horarioTermino || params.horarioTermino || '';
   const descricao = eventoContexto?.descricao || params.descricao || '';
   const situacao = (eventoContexto?.situacao || params.situacao || 'agendado') as 'agendado' | 'em_andamento' | 'encerrado';
+  const idEvento = eventId || eventoContexto?.id || '';
+
+  const [diasEvento, setDiasEvento] = useState<DiaEvento[]>([]);
+  const [diaSelecionadoId, setDiaSelecionadoId] = useState('');
+  const [carregandoDias, setCarregandoDias] = useState(true);
+  const [diaEmProcessamento, setDiaEmProcessamento] = useState('');
+
+  const recarregarDias = useCallback(async () => {
+    if (!idEvento) {
+      setDiasEvento([]);
+      setDiaSelecionadoId('');
+      setCarregandoDias(false);
+      return;
+    }
+
+    setCarregandoDias(true);
+    try {
+      const dias = await buscarDiasEvento(db, idEvento);
+      setDiasEvento(dias);
+      setDiaSelecionadoId((atual) => {
+        if (atual && dias.some((dia) => dia.id === atual)) return atual;
+        return dias.find((dia) => dia.status === 'em_andamento')?.id ?? dias[0]?.id ?? '';
+      });
+    } catch (erro) {
+      console.error('Não foi possível carregar os dias do evento:', erro);
+      Alert.alert('Não foi possível carregar os dias', 'Os dados do evento continuam salvos, mas não foi possível consultar o controle diário neste momento.');
+    } finally {
+      setCarregandoDias(false);
+    }
+  }, [db, idEvento]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void recarregarDias();
+    }, [recarregarDias])
+  );
+
+  const diaSelecionado = diasEvento.find((dia) => dia.id === diaSelecionadoId) ?? null;
+  const diaAtivo = diasEvento.find((dia) => dia.status === 'em_andamento') ?? null;
+
+  async function alterarStatusDia(dia: DiaEvento) {
+    if (!idEvento || diaEmProcessamento) return;
+
+    setDiaEmProcessamento(dia.id);
+    try {
+      if (dia.status === 'nao_iniciado') {
+        await iniciarDiaEvento(db, dia.id);
+      } else if (dia.status === 'em_andamento') {
+        await concluirDiaEvento(db, dia.id);
+      }
+      await recarregarDias();
+    } catch (erro) {
+      Alert.alert(
+        'Não foi possível atualizar o dia',
+        erro instanceof Error ? erro.message : 'Confira o estado do evento e tente novamente.'
+      );
+    } finally {
+      setDiaEmProcessamento('');
+    }
+  }
 
   // Estados dos modais de suporte[cite: 6]
   const [modalMenuVisivel, setModalMenuVisivel] = useState(false);
@@ -73,6 +140,7 @@ export default function DetalhesEvento() {
 
     try {
       await encerrarEvento(eventId);
+      await recarregarDias();
       Alert.alert('Evento encerrado', 'O evento foi finalizado e salvo neste dispositivo.', [
         { text: 'OK', onPress: () => router.replace('/') },
       ]);
@@ -290,6 +358,112 @@ export default function DetalhesEvento() {
               </TouchableOpacity>
             )}
           </View>
+
+          {Boolean(idEvento) && (
+            <View style={{ backgroundColor: tema.surface, borderColor: tema.border, borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <Ionicons name="calendar-outline" size={19} color={tema.primary} />
+                <Text style={{ color: tema.text, fontSize: 15, fontWeight: '800' }}>Controle dos dias</Text>
+              </View>
+              <Text style={{ color: tema.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>
+                Inicie e conclua cada dia do evento por aqui. O gerenciamento de presença continua na seção Participantes.
+              </Text>
+
+              {carregandoDias ? (
+                <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={tema.primary} />
+                  <Text style={{ color: tema.textSecondary, fontSize: 12, marginTop: 7 }}>Carregando dias...</Text>
+                </View>
+              ) : diasEvento.length === 0 ? (
+                <Text style={{ color: tema.textSecondary, fontSize: 12 }}>Nenhum dia foi configurado para este evento.</Text>
+              ) : (
+                <>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
+                    {diasEvento.map((dia) => {
+                      const selecionado = diaSelecionadoId === dia.id;
+                      return (
+                        <TouchableOpacity
+                          key={dia.id}
+                          onPress={() => setDiaSelecionadoId(dia.id)}
+                          style={{ minWidth: 92, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: selecionado ? tema.primary : tema.border, backgroundColor: selecionado ? tema.primary : tema.surfaceSecondary }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: selecionado }}
+                          accessibilityLabel={`Selecionar dia ${dia.numero}, ${formatarDataDiaEvento(dia.data)}`}
+                        >
+                          <Text style={{ color: selecionado ? tema.primaryText : tema.text, fontWeight: '800', fontSize: 13 }}>Dia {dia.numero}</Text>
+                          <Text style={{ color: selecionado ? tema.primaryText : tema.textSecondary, fontSize: 11, marginTop: 3 }}>{formatarDataDiaEvento(dia.data)}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {diaSelecionado && (
+                    <View style={{ backgroundColor: tema.surfaceSecondary, borderRadius: 11, padding: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
+                        <View>
+                          <Text style={{ color: tema.text, fontWeight: '800', fontSize: 14 }}>Dia {diaSelecionado.numero}</Text>
+                          <Text style={{ color: tema.textSecondary, fontSize: 11, marginTop: 2 }}>{formatarDataDiaEvento(diaSelecionado.data)}</Text>
+                        </View>
+                        <Text style={{ color: diaSelecionado.status === 'em_andamento' ? '#16865B' : tema.textSecondary, fontSize: 10, fontWeight: '800' }}>
+                          {diaSelecionado.status === 'em_andamento' ? 'EM ANDAMENTO' : diaSelecionado.status === 'concluido' ? 'CONCLUÍDO' : diaSelecionado.status === 'nao_realizado' ? 'NÃO REALIZADO' : 'NÃO INICIADO'}
+                        </Text>
+                      </View>
+
+                      {situacao === 'em_andamento' && diaSelecionado.status === 'nao_iniciado' && !diaAtivo && (
+                        <TouchableOpacity
+                          onPress={() => void alterarStatusDia(diaSelecionado)}
+                          disabled={diaEmProcessamento === diaSelecionado.id}
+                          style={{ minHeight: 43, borderRadius: 9, backgroundColor: tema.primary, alignItems: 'center', justifyContent: 'center', opacity: diaEmProcessamento ? 0.65 : 1 }}
+                        >
+                          {diaEmProcessamento === diaSelecionado.id
+                            ? <ActivityIndicator color={tema.primaryText} />
+                            : <Text style={{ color: tema.primaryText, fontWeight: '800' }}>Iniciar dia {diaSelecionado.numero}</Text>}
+                        </TouchableOpacity>
+                      )}
+
+                      {situacao === 'em_andamento' && diaSelecionado.status === 'em_andamento' && (
+                        <TouchableOpacity
+                          onPress={() => void alterarStatusDia(diaSelecionado)}
+                          disabled={diaEmProcessamento === diaSelecionado.id}
+                          style={{ minHeight: 43, borderRadius: 9, backgroundColor: '#16865B', alignItems: 'center', justifyContent: 'center', opacity: diaEmProcessamento ? 0.65 : 1 }}
+                        >
+                          {diaEmProcessamento === diaSelecionado.id
+                            ? <ActivityIndicator color="#FFFFFF" />
+                            : <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Concluir dia {diaSelecionado.numero}</Text>}
+                        </TouchableOpacity>
+                      )}
+
+                      {situacao === 'em_andamento' && diaSelecionado.status === 'nao_iniciado' && diaAtivo && (
+                        <Text style={{ color: tema.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                          Conclua o Dia {diaAtivo.numero} antes de iniciar outro dia.
+                        </Text>
+                      )}
+                      {situacao === 'agendado' && (
+                        <Text style={{ color: tema.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                          O controle diário será liberado quando o evento for iniciado.
+                        </Text>
+                      )}
+                      {situacao === 'encerrado' && (
+                        <Text style={{ color: tema.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                          Evento encerrado. Os dias permanecem disponíveis para consulta; correções de presença ficam em Participantes → Por dia.
+                        </Text>
+                      )}
+                      {diaSelecionado.status === 'concluido' && situacao !== 'encerrado' && (
+                        <Text style={{ color: tema.textSecondary, fontSize: 12, marginTop: 2 }}>
+                          Este dia já foi concluído. Selecione o próximo dia para continuar.
+                        </Text>
+                      )}
+                      {diaSelecionado.status === 'nao_realizado' && (
+                        <Text style={{ color: tema.textSecondary, fontSize: 12, marginTop: 2 }}>
+                          Este dia foi marcado como não realizado e não pode ser iniciado.
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
 
           <View style={styles.warningNote}>
             <Ionicons name="information-circle-outline" size={16} color={tema.textSecondary} />

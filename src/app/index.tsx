@@ -279,8 +279,8 @@ export default function Home() {
 
             <Pressable onPress={() => router.push({ pathname: '/(funcoes)/eventos', params: { origem: 'home' } })} style={[styles.cartao, { backgroundColor: tema.surfaceSecondary, borderColor: tema.border }]}>
               <Ionicons name="calendar-outline" size={42} color={tema.primary} />
-              <Text style={[styles.cartaoTitulo, { color: tema.text }]}>Eventos</Text>
-              <Text style={[styles.cartaoDescricao, { color: tema.textSecondary }]}>Acesse os eventos</Text>
+              <Text style={[styles.cartaoTitulo, { color: tema.text }]}>Criar evento</Text>
+              <Text style={[styles.cartaoDescricao, { color: tema.textSecondary }]}>Cadastre um novo evento</Text>
             </Pressable>
 
             <Pressable

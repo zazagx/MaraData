@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTema } from '../../../context/temaContexto';
+import BotaoTemaHeader from '../../../components/BotaoTemaHeader';
 import { useEstilosTema } from '../../../context/temaEstilos';
 import { buscarFilas, type Fila } from '../../../features/armazenamentofilas';
 
@@ -79,9 +80,17 @@ const filasExibidas = eventId ? filas.filter((fila) => fila.eventId === eventId)
           </Pressable>
         ),
         headerRight: () => (
-          <Pressable style={[styles.botaoAdicionar, !eventoDisponivel && styles.botaoInativo]} onPress={abrirCriacao}>
-            <Text style={styles.iconeMais}>+</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+            <BotaoTemaHeader margemDireita={0} />
+            <Pressable
+              style={[styles.botaoAdicionar, !eventoDisponivel && styles.botaoInativo]}
+              onPress={abrirCriacao}
+              accessibilityRole="button"
+              accessibilityLabel="Criar fila"
+            >
+              <Text style={styles.iconeMais}>+</Text>
+            </Pressable>
+          </View>
         ),
       }} />
 

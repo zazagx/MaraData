@@ -3,6 +3,7 @@ import {
   type Participante
 } from '@/features/armazenamentoParticipantes';
 import { useTema } from '../../../context/temaContexto';
+import BotaoTemaHeader from '../../../components/BotaoTemaHeader';
 import { useEstilosTema } from '../../../context/temaEstilos';
 import {
   buscarParticipantesDoEvento,
@@ -13,10 +14,8 @@ import {
   buscarIdsPresentesNoDia,
   buscarParticipantesDoDia,
   buscarResumoPresencasEvento,
-  concluirDiaEvento,
   definirPresencaManual,
   formatarDataDiaEvento,
-  iniciarDiaEvento,
   type DiaEvento,
   type ResumoPresencasEvento,
 } from '../../../features/armazenamentoPresencasFeedback';
@@ -175,16 +174,6 @@ export default function ParticipantesCadastrados() {
     }
   }
 
-  async function alterarStatusDia(dia: DiaEvento) {
-    try {
-      if (dia.status === 'nao_iniciado') await iniciarDiaEvento(db, dia.id);
-      else if (dia.status === 'em_andamento') await concluirDiaEvento(db, dia.id);
-      await atualizarDiaSelecionado(dia.id);
-    } catch (erro) {
-      Alert.alert('Não foi possível atualizar o dia', erro instanceof Error ? erro.message : 'Tente novamente.');
-    }
-  }
-
 
   // Filters participants by name.
   const fonteParticipantes = eventId && secaoEvento === 'dias' ? participantesDoDia : participantes;
@@ -264,14 +253,19 @@ export default function ParticipantesCadastrados() {
           headerTitleAlign: 'center',
 
           headerRight: () => (
-            !eventoEncerrado ? (
-              <Pressable
-                style={styles.botaoAdicionar}
-                onPress={() => router.push(eventId ? { pathname: '/novoparticipante', params: { eventId } } : '/novoparticipante')}
-              >
-                <Text style={styles.iconeMais}>+</Text>
-              </Pressable>
-            ) : null
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+              <BotaoTemaHeader margemDireita={0} />
+              {!eventoEncerrado && (
+                <Pressable
+                  style={styles.botaoAdicionar}
+                  onPress={() => router.push(eventId ? { pathname: '/novoparticipante', params: { eventId } } : '/novoparticipante')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cadastrar participante"
+                >
+                  <Text style={styles.iconeMais}>+</Text>
+                </Pressable>
+              )}
+            </View>
           ),
         }}
       />
@@ -339,25 +333,19 @@ export default function ParticipantesCadastrados() {
                           </Text>
                         </View>
                         <Text style={{ color: tema.textSecondary, fontSize: 12, marginBottom: 10 }}>{presentesNoDia.size} participante(s) com presença registrada.</Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          {!eventoEncerrado && diaSelecionado.status === 'nao_iniciado' && params.situacao === 'em_andamento' && (
-                            <Pressable onPress={() => void alterarStatusDia(diaSelecionado)} style={{ flex: 1, backgroundColor: tema.primary, padding: 11, borderRadius: 9, alignItems: 'center' }}>
-                              <Text style={{ color: tema.primaryText, fontWeight: '700' }}>Iniciar dia</Text>
-                            </Pressable>
-                          )}
-                          {!eventoEncerrado && diaSelecionado.status === 'em_andamento' && (
-                            <Pressable onPress={() => void alterarStatusDia(diaSelecionado)} style={{ flex: 1, backgroundColor: '#16865B', padding: 11, borderRadius: 9, alignItems: 'center' }}>
-                              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Concluir dia</Text>
-                            </Pressable>
-                          )}
-                          {(diaSelecionado.status === 'em_andamento' || diaSelecionado.status === 'concluido') && (
-                            <Pressable onPress={() => { setBuscaPresenca(''); setModalPresencaVisivel(true); }} style={{ flex: 1, backgroundColor: tema.surfaceSecondary, padding: 11, borderRadius: 9, alignItems: 'center' }}>
-                              <Text style={{ color: tema.primary, fontWeight: '700' }}>{eventoEncerrado ? 'Corrigir presenças' : 'Gerenciar presença'}</Text>
-                            </Pressable>
-                          )}
-                        </View>
-                        {diaSelecionado.status === 'nao_iniciado' && params.situacao !== 'em_andamento' && (
-                          <Text style={{ color: tema.textSecondary, fontSize: 12 }}>Inicie o evento para liberar o controle de presença diária.</Text>
+                        {(diaSelecionado.status === 'em_andamento' || diaSelecionado.status === 'concluido') ? (
+                          <Pressable
+                            onPress={() => { setBuscaPresenca(''); setModalPresencaVisivel(true); }}
+                            style={{ backgroundColor: tema.surfaceSecondary, padding: 11, borderRadius: 9, alignItems: 'center' }}
+                          >
+                            <Text style={{ color: tema.primary, fontWeight: '700' }}>{eventoEncerrado ? 'Corrigir presenças' : 'Gerenciar presença'}</Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={{ color: tema.textSecondary, fontSize: 12 }}>
+                            {diaSelecionado.status === 'nao_realizado'
+                              ? 'Este dia foi marcado como não realizado.'
+                              : 'Para iniciar ou concluir este dia, acesse Detalhes do evento → Ações administrativas.'}
+                          </Text>
                         )}
                       </View>
                     )}

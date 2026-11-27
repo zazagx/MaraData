@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
-import { Pressable, Text } from 'react-native';
+import { Pressable } from 'react-native';
 import { useTema } from '../../../context/temaContexto';
+import BotaoTemaHeader from '../../../components/BotaoTemaHeader';
 
 export default function ParticipantesLayout() {
   const { tema } = useTema();
@@ -20,6 +21,7 @@ export default function ParticipantesLayout() {
         contentStyle: {
           backgroundColor: tema.background,
         },
+        headerRight: () => <BotaoTemaHeader />, 
       }}
     >
       <Stack.Screen
@@ -34,24 +36,6 @@ export default function ParticipantesLayout() {
               accessibilityLabel="Voltar para o início"
             >
               <Ionicons name="arrow-back" size={24} color={tema.text} />
-            </Pressable>
-          ),
-          headerRight: () => (
-            <Pressable
-              onPress={() => router.push('/novoparticipante')}
-              style={{
-                backgroundColor: tema.surfaceSecondary,
-                width: 36,
-                height: 36,
-                borderRadius: 20,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 8,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Cadastrar participante"
-            >
-              <Text style={{ color: tema.primary, fontSize: 25, lineHeight: 30 }}>+</Text>
             </Pressable>
           ),
         }}

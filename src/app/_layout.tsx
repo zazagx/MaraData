@@ -26,7 +26,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // Componente responsável pela navegação
 function ConteudoLayout() {
   const { tema, modoEscuro, alternarTema } = useTema();
-  const { sessao, carregandoAutenticacao, entrar } = useAutenticacao();
+  const { sessao, acessoOfflineAutorizado, carregandoAutenticacao, entrar } = useAutenticacao();
   const { carregandoEventos } = useEvento();
 
   const [splashNativaOculta, setSplashNativaOculta] = useState(false);
@@ -71,7 +71,7 @@ function ConteudoLayout() {
     );
   }
 
-  if (!sessao) {
+  if (!sessao && !acessoOfflineAutorizado) {
     return <TelaLogin onEntrar={entrar} />;
   }
 
