@@ -2,8 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Image } from 'expo-image';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTema } from '../../../context/temaContexto';
 import { useEstilosTema } from '../../../context/temaEstilos';
 import { buscarFilas, type Fila } from '../../../features/armazenamentofilas';
@@ -18,7 +17,16 @@ export default function ListaFilas() {
     nomeEvento?: string;
     localEvento?: string;
     situacao?: string;
+    origem?: string;
   }>();
+  const voltarDaFila = () => {
+    if (params.origem === 'detalhes' && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
   const [filas, setFilas] = useState<Fila[]>([]);
   const [erroCarregamento, setErroCarregamento] = useState('');
 
@@ -66,7 +74,7 @@ const filasExibidas = eventId ? filas.filter((fila) => fila.eventId === eventId)
         headerTintColor: tema.text,
         headerTitleAlign: 'center',
         headerLeft: () => (
-          <Pressable onPress={() => router.replace('/')} style={{ marginLeft: 8 }}>
+          <Pressable onPress={voltarDaFila} style={{ marginLeft: 8 }}>
             <Ionicons name="arrow-back" size={24} color={tema.text} />
           </Pressable>
         ),
@@ -121,12 +129,8 @@ const filasExibidas = eventId ? filas.filter((fila) => fila.eventId === eventId)
           </Pressable>
         )}
         ListFooterComponent={(
-          <View style={styles.mascoteContainer} pointerEvents="none">
-            <Image
-              source={require('../../../components/icons/LoboIcone.png')}
-              style={styles.logoFundo}
-              contentFit="contain"
-            />
+          <View style={styles.mascoteContainer}>
+            <Image source={require('../../../components/icons/LoboIcone.png')} style={styles.logoFundo} resizeMode="contain" />
           </View>
         )}
       />

@@ -38,7 +38,7 @@ export default function AberturaAnimada({
 
   const rotacaoEstrela = useRef(new Animated.Value(0)).current;
   const escalaEstrela = useRef(new Animated.Value(1)).current;
-  const opacidadeEstrela = useRef(new Animated.Value(0)).current;
+  const opacidadeEstrela = useRef(new Animated.Value(1)).current;
   const opacidadeTitulo = useRef(new Animated.Value(0)).current;
   const deslocamentoTitulo = useRef(new Animated.Value(10)).current;
   const opacidadeTela = useRef(new Animated.Value(1)).current;

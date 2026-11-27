@@ -33,6 +33,7 @@ export default function DetalhesEvento() {
     horarioTermino?: string;
     descricao?: string;
     situacao?: 'agendado' | 'em_andamento' | 'encerrado';
+    origem?: string;
   }>();
 
   const eventId = typeof params.eventId === 'string' ? params.eventId : undefined;
@@ -98,20 +99,21 @@ export default function DetalhesEvento() {
         horarioTermino,
         descricao,
         situacao,
+        origem: 'detalhes',
       },
     });
   };
 
   const acessarNavegacao = (tela: string) => {
     if (tela === 'participantes') {
-      router.push({ pathname: '/(funcoes)/(participantes)/participantescadastrados', params: { eventId: eventId || '', situacao } });
+      router.push({ pathname: '/(funcoes)/(participantes)/participantescadastrados', params: { eventId: eventId || '', situacao, origem: 'detalhes' } });
     } else if (tela === 'filas') {
       router.push({
         pathname: '/(funcoes)/filas',
-        params: { eventId: eventId || '', nomeEvento, localEvento, situacao },
+        params: { eventId: eventId || '', nomeEvento, localEvento, situacao, origem: 'detalhes' },
       });
     } else if (tela === 'estatisticas') {
-      router.push({ pathname: '/(funcoes)/estatistica', params: { eventId: eventId || '' } });
+      router.push({ pathname: '/(funcoes)/estatistica', params: { eventId: eventId || '', origem: 'detalhes' } });
     }
   };
 

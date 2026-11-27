@@ -102,6 +102,7 @@ export default function Eventos() {
     horarioTermino?: string;
     descricao?: string;
     situacao?: 'agendado' | 'em_andamento';
+    origem?: string;
   }>();
 
   const estaEditando = params.editando === 'true';
@@ -387,6 +388,12 @@ export default function Eventos() {
         {
           text: 'OK',
           onPress: () => {
+            // Se a edição veio dos detalhes, retorna à tela que já está aberta.
+            if (params.origem === 'detalhes' && router.canGoBack()) {
+              router.back();
+              return;
+            }
+
             router.replace({
               pathname: '/(funcoes)/eventos/detalhes',
               params: {
@@ -399,6 +406,7 @@ export default function Eventos() {
                 horarioTermino: eventoSalvo.horarioTermino,
                 descricao: eventoSalvo.descricao,
                 situacao: eventoSalvo.situacao,
+                origem: params.origem || 'home',
               },
             });
           },
@@ -413,7 +421,13 @@ export default function Eventos() {
     }
   };
 
-  const irParaHome = () => router.replace('/');
+  const irParaHome = () => {
+    if (params.origem === 'detalhes' && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
 
   const valoresMinutos = situacao === 'em_andamento'
     ? Array.from({ length: 60 }, (_, i) => i)
@@ -427,7 +441,7 @@ export default function Eventos() {
           title: estaEditando ? 'Editar evento' : 'Cadastrar evento',
           headerLeft: () => (
             <TouchableOpacity 
-              onPress={() => router.replace('/')} 
+              onPress={irParaHome} 
               style={{ marginLeft: 4, marginRight: 12 }}
               accessibilityLabel="Voltar para Home"
             >

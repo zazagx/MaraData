@@ -24,7 +24,7 @@ export default function Home() {
   // Abre os detalhes do evento se existir, ou vai para o cadastro se estiver vazio.
   function abrirDetalhes() {
     if (!temEvento || !eventoAtivo) {
-      router.push('/(funcoes)/eventos');
+      router.push({ pathname: '/(funcoes)/eventos', params: { origem: 'home' } });
       return;
     }
 
@@ -40,6 +40,7 @@ export default function Home() {
         horarioTermino: eventoAtivo.horarioTermino,
         descricao: eventoAtivo.descricao,
         situacao: eventoAtivo.situacao,
+        origem: 'home',
       },
     });
   }
@@ -47,7 +48,7 @@ export default function Home() {
   // Abre as filas enviando os dados do evento.
   function abrirFilas() {
     if (!temEvento || !eventoAtivo) {
-      router.push('/(funcoes)/filas');
+      router.push({ pathname: '/(funcoes)/filas', params: { origem: 'home' } });
       return;
     }
 
@@ -58,6 +59,7 @@ export default function Home() {
         nomeEvento: eventoAtivo.nomeEvento,
         localEvento: eventoAtivo.localEvento,
         situacao: eventoAtivo.situacao,
+        origem: 'home',
       },
     });
   }
@@ -250,7 +252,7 @@ export default function Home() {
         <View style={styles.grupoCartoes}>
           <View style={styles.linhaCartoes}>
             <Pressable
-              onPress={() => router.push('/participantescadastrados')}
+              onPress={() => router.push({ pathname: '/(funcoes)/(participantes)/participantescadastrados', params: { origem: 'home' } })}
               style={[styles.cartao, { backgroundColor: tema.surfaceSecondary, borderColor: tema.border }]}
             >
               <Ionicons name="people-outline" size={42} color={tema.primary} />
@@ -267,7 +269,7 @@ export default function Home() {
 
           <View style={styles.linhaCartoes}>
             <Pressable
-              onPress={() => router.push('/estatistica')}
+              onPress={() => router.push({ pathname: '/(funcoes)/estatistica', params: { origem: 'home' } })}
               style={[styles.cartao, { backgroundColor: tema.surfaceSecondary, borderColor: tema.border }]}
             >
               <Ionicons name="stats-chart-outline" size={42} color={tema.primary} />
@@ -275,14 +277,14 @@ export default function Home() {
               <Text style={[styles.cartaoDescricao, { color: tema.textSecondary }]}>Veja os resultados</Text>
             </Pressable>
 
-            <Pressable onPress={() => router.push('/eventos')} style={[styles.cartao, { backgroundColor: tema.surfaceSecondary, borderColor: tema.border }]}>
+            <Pressable onPress={() => router.push({ pathname: '/(funcoes)/eventos', params: { origem: 'home' } })} style={[styles.cartao, { backgroundColor: tema.surfaceSecondary, borderColor: tema.border }]}>
               <Ionicons name="calendar-outline" size={42} color={tema.primary} />
               <Text style={[styles.cartaoTitulo, { color: tema.text }]}>Eventos</Text>
               <Text style={[styles.cartaoDescricao, { color: tema.textSecondary }]}>Acesse os eventos</Text>
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/(funcoes)/eventos/historico')}
+              onPress={() => router.push({ pathname: '/(funcoes)/eventos/historico', params: { origem: 'home' } })}
               style={[styles.cartao, { backgroundColor: tema.surfaceSecondary, borderColor: tema.border }]}
             >
               <Ionicons name="server-outline" size={42} color={tema.primary} />
