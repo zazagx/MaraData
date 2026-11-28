@@ -6,7 +6,7 @@ import {
   useState,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../services/supabase';
 
 type AutenticacaoContextoTipo = {
@@ -19,7 +19,7 @@ type AutenticacaoContextoTipo = {
 };
 
 const AutenticacaoContexto = createContext<AutenticacaoContextoTipo | undefined>(undefined);
-const CHAVE_ACESSO_OFFLINE = '@maradata:acesso_offline_autorizado';
+const CHAVE_ACESSO_OFFLINE = 'maradata.offline.access.v1';
 const TEMPO_MAX_RECUPERACAO_SESSAO_MS = 10_000;
 
 export function AutenticacaoProvider({ children }: { children: ReactNode }) {
@@ -33,7 +33,7 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
     // Mesmo que a configuração remota esteja temporariamente ausente, uma
     // autorização local já registrada continua permitindo consultar o SQLite.
     if (!supabase) {
-      void AsyncStorage.getItem(CHAVE_ACESSO_OFFLINE)
+      void SecureStore.getItemAsync(CHAVE_ACESSO_OFFLINE)
         .then((idUsuario) => {
           if (ativo && idUsuario) setAcessoOfflineAutorizado(true);
         })
@@ -62,16 +62,14 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
       setCarregandoAutenticacao(false);
     };
 
-    const salvarAcessoLocal = (idUsuario: string) => {
-      setAcessoOfflineAutorizado(true);
-      void AsyncStorage.setItem(CHAVE_ACESSO_OFFLINE, idUsuario).catch((erro) => {
-        console.warn('Não foi possível salvar a autorização offline do MaraData:', erro);
-      });
+    const salvarAcessoLocal = async (idUsuario: string) => {
+      await SecureStore.setItemAsync(CHAVE_ACESSO_OFFLINE, idUsuario);
+      if (ativo) setAcessoOfflineAutorizado(true);
     };
 
     // Recupera primeiro a autorização local. Ela não depende da rede nem da
     // renovação do token e só é criada depois de um login válido.
-    void AsyncStorage.getItem(CHAVE_ACESSO_OFFLINE)
+    void SecureStore.getItemAsync(CHAVE_ACESSO_OFFLINE)
       .then((idUsuario) => {
         if (!ativo) return;
         if (idUsuario) {
@@ -92,7 +90,9 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
       setSessao(novaSessao);
       if (novaSessao) {
         acessoLocalEncontrado = true;
-        salvarAcessoLocal(novaSessao.user.id);
+        void salvarAcessoLocal(novaSessao.user.id).catch((erro) => {
+          console.warn('Não foi possível salvar a autorização offline do MaraData:', erro);
+        });
       }
       supabaseCarregado = true;
       liberarAberturaQuandoPronto();
@@ -109,7 +109,9 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
         if (data.session) {
           acessoLocalEncontrado = true;
           setSessao(data.session);
-          salvarAcessoLocal(data.session.user.id);
+          void salvarAcessoLocal(data.session.user.id).catch((erro) => {
+            console.warn('Não foi possível salvar a autorização offline do MaraData:', erro);
+          });
         }
       })
       .catch((erro: unknown) => {
@@ -149,14 +151,14 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
 
     if (data.session) {
+      try {
+        await SecureStore.setItemAsync(CHAVE_ACESSO_OFFLINE, data.session.user.id);
+      } catch (erro) {
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        throw new Error(`O login foi validado, mas não foi possível salvar a autorização offline neste dispositivo: ${String(erro)}`);
+      }
       setSessao(data.session);
       setAcessoOfflineAutorizado(true);
-      try {
-        await AsyncStorage.setItem(CHAVE_ACESSO_OFFLINE, data.session.user.id);
-      } catch (erro) {
-        // A falha ao gravar o marcador não desfaz um login remoto bem-sucedido.
-        console.warn('Não foi possível persistir a autorização offline:', erro);
-      }
     }
   }
 
@@ -164,7 +166,7 @@ export function AutenticacaoProvider({ children }: { children: ReactNode }) {
     // O logout local deve funcionar mesmo sem rede ou com token expirado.
     setAcessoOfflineAutorizado(false);
     setSessao(null);
-    await AsyncStorage.removeItem(CHAVE_ACESSO_OFFLINE);
+    await SecureStore.deleteItemAsync(CHAVE_ACESSO_OFFLINE);
     if (!supabase) return;
 
     const { error } = await supabase.auth.signOut({ scope: 'local' });

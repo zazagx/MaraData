@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Drawer } from 'expo-router/drawer';
+import * as SQLite from 'expo-sqlite';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,7 +22,8 @@ import TelaLogin from '../components/TelaLogin';
 import AberturaAnimada from '../components/AberturaAnimada';
 import SincronizacaoAutomatica from '../components/SincronizacaoAutomatica';
 import { TemaProvider, useTema } from '../context/temaContexto';
-import { migrateDbIfNeeded } from '../database/migrations';
+import { inicializarBancoCriptografado } from '../database/bancoSeguro';
+import { prepararArmazenamentoSeguroInicial } from '../services/preparacaoSegura';
 
 // Mantém a splash nativa visível até SQLite, autenticação e eventos estarem prontos.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -26,7 +31,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // Componente responsável pela navegação
 function ConteudoLayout() {
   const { tema, modoEscuro, alternarTema } = useTema();
-  const { sessao, acessoOfflineAutorizado, carregandoAutenticacao, entrar } = useAutenticacao();
+  const { sessao, acessoOfflineAutorizado, carregandoAutenticacao, entrar, sair } = useAutenticacao();
   const { carregandoEventos } = useEvento();
 
   const [splashNativaOculta, setSplashNativaOculta] = useState(false);
@@ -90,27 +95,53 @@ function ConteudoLayout() {
             />
           ),
 
-          // Botão de alternância do tema
+          // Ações do cabeçalho: tema e encerramento explícito do acesso local.
           headerRight: () => (
-            <TouchableOpacity
-              style={[
-                styles.themeButton,
-                { backgroundColor: tema.surfaceSecondary },
-              ]}
-              onPress={alternarTema}
-              accessibilityRole="button"
-              accessibilityLabel={
-                modoEscuro
-                  ? 'Ativar tema claro'
-                  : 'Ativar tema escuro'
-              }
-            >
-              <Ionicons
-                name={modoEscuro ? 'sunny-outline' : 'moon-outline'}
-                size={23}
-                color={tema.primary}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={[
+                  styles.themeButton,
+                  { backgroundColor: tema.surfaceSecondary },
+                ]}
+                onPress={alternarTema}
+                accessibilityRole="button"
+                accessibilityLabel={modoEscuro ? 'Ativar tema claro' : 'Ativar tema escuro'}
+              >
+                <Ionicons
+                  name={modoEscuro ? 'sunny-outline' : 'moon-outline'}
+                  size={23}
+                  color={tema.primary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.logoutButton,
+                  { backgroundColor: tema.surfaceSecondary },
+                ]}
+                onPress={() => {
+                  Alert.alert(
+                    'Encerrar acesso neste dispositivo?',
+                    'A próxima utilização exigirá um novo login com internet. Os registros locais criptografados serão preservados.',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Encerrar acesso',
+                        style: 'destructive',
+                        onPress: () => {
+                          void sair().catch((erro: unknown) => {
+                            Alert.alert('Não foi possível encerrar o acesso', String(erro));
+                          });
+                        },
+                      },
+                    ]
+                  );
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Encerrar acesso neste dispositivo"
+              >
+                <Ionicons name="log-out-outline" size={22} color={tema.textSecondary} />
+              </TouchableOpacity>
+            </View>
           ),
 
           // Cabeçalho
@@ -179,12 +210,88 @@ function ConteudoLayout() {
   );
 }
 
-// Layout principal: disponibiliza os contextos e inicializa o banco local.
+// A versão web não possui SQLCipher no expo-sqlite. Como este produto é interno
+// e móvel, ela fica bloqueada para não armazenar dados pessoais em SQLite sem cifra.
+function AvisoPlataformaNaoSuportada() {
+  useEffect(() => {
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+  return (
+    <View style={styles.erroInicializacao}>
+      <Text style={styles.erroTitulo}>MaraData disponível somente no aplicativo</Text>
+      <Text style={styles.erroTexto}>
+        Para proteger os dados, utilize a versão Android ou iOS com banco criptografado.
+      </Text>
+    </View>
+  );
+}
+
+function PreparacaoInicial({ onPronto, onErro }: { onPronto: () => void; onErro: (mensagem: string) => void }) {
+  useEffect(() => {
+    let ativo = true;
+    async function preparar() {
+      try {
+        await prepararArmazenamentoSeguroInicial();
+        if (ativo) onPronto();
+      } catch (erro) {
+        if (ativo) onErro(
+          `Não foi possível remover com segurança os dados de teste antigos. O banco novo não será aberto. Detalhe: ${String(erro)}`
+        );
+      }
+    }
+    void preparar();
+    return () => { ativo = false; };
+  }, [onPronto, onErro]);
+
+  return (
+    <View style={styles.telaAbertura}>
+      <ActivityIndicator size="large" color="#8000FF" />
+      <Text style={styles.textoPreparacao}>Preparando armazenamento seguro...</Text>
+    </View>
+  );
+}
+
+function ErroPreparacao({ mensagem, tentarNovamente }: { mensagem: string; tentarNovamente: () => void }) {
+  useEffect(() => {
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+  return (
+    <View style={styles.erroInicializacao}>
+      <Text style={styles.erroTitulo}>Não foi possível proteger o banco</Text>
+      <Text style={styles.erroTexto}>{mensagem}</Text>
+      <TouchableOpacity style={styles.botaoTentarNovamente} onPress={tentarNovamente}>
+        <Text style={styles.botaoTentarNovamenteTexto}>Tentar novamente</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Layout principal: limpa a base de teste anterior e só então abre o novo banco SQLCipher.
 export default function RootLayout() {
+  const [preparacaoConcluida, setPreparacaoConcluida] = useState(false);
+  const [erroPreparacao, setErroPreparacao] = useState<string | null>(null);
+  const [tentativa, setTentativa] = useState(0);
+
+  const marcarPronto = useCallback(() => {
+    setErroPreparacao(null);
+    setPreparacaoConcluida(true);
+  }, []);
+  const marcarErro = useCallback((mensagem: string) => {
+    setErroPreparacao(mensagem);
+  }, []);
+
+  if (Platform.OS === 'web') return <AvisoPlataformaNaoSuportada />;
+  if (erroPreparacao) {
+    return <ErroPreparacao mensagem={erroPreparacao} tentarNovamente={() => { setErroPreparacao(null); setPreparacaoConcluida(false); setTentativa((valor) => valor + 1); }} />;
+  }
+  if (!preparacaoConcluida) {
+    return <PreparacaoInicial key={tentativa} onPronto={marcarPronto} onErro={marcarErro} />;
+  }
+
   return (
     <SQLiteProvider
-      databaseName="maradata.db"
-      onInit={migrateDbIfNeeded}
+      databaseName="maradata-seguro.db"
+      onInit={inicializarBancoCriptografado}
     >
       <TemaProvider>
         <AutenticacaoProvider>
@@ -200,7 +307,45 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   telaAbertura: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FFFFFF',
+  },
+  textoPreparacao: {
+    marginTop: 14,
+    color: '#333333',
+    fontSize: 14,
+  },
+  erroInicializacao: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+  },
+  erroTitulo: {
+    color: '#8A174C',
+    fontSize: 19,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  erroTexto: {
+    color: '#333333',
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  botaoTentarNovamente: {
+    marginTop: 22,
+    backgroundColor: '#8000FF',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  botaoTentarNovamenteTexto: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   headerTitle: {
     flexDirection: 'row',
@@ -215,6 +360,19 @@ const styles = StyleSheet.create({
   headerTitleText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 8,
+  },
+  logoutButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   themeButton: {
     width: 42,

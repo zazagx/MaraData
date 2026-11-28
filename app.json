@@ -18,7 +18,8 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "allowBackup": false
     },
     "web": {
       "output": "static",
@@ -47,9 +48,20 @@
       "expo-image",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
-      "expo-sqlite",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "expo-status-bar",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

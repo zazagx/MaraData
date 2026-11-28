@@ -1,5 +1,6 @@
 import { AppState, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { armazenamentoSeguroSupabase } from './armazenamentoSeguro';
+import { obterChaveArmazenamentoSupabase } from './chavesArmazenamento';
 import * as Network from 'expo-network';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
@@ -11,7 +12,7 @@ const supabasePublishableKey =
 
 /**
  * Cliente Supabase do MaraData.
- * No aplicativo nativo, a sessão fica salva no AsyncStorage.
+ * No aplicativo nativo, a sessão fica no Android Keystore / iOS Keychain.
  * A renovação automática é pausada quando o sistema informa que não há internet,
  * evitando que uma tentativa de refresh durante o uso offline interfira no acesso local.
  */
@@ -19,7 +20,8 @@ export const supabase =
   supabaseUrl && supabasePublishableKey
     ? createClient(supabaseUrl, supabasePublishableKey, {
         auth: {
-          ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
+          storageKey: obterChaveArmazenamentoSupabase(supabaseUrl),
+          ...(Platform.OS !== 'web' ? { storage: armazenamentoSeguroSupabase } : {}),
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: false,
